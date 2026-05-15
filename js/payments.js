@@ -10,12 +10,18 @@ const Payments = {
     const form = new FormData();
     form.append('receipt', file);
     const token = localStorage.getItem('buxinev_token');
-    const res = await fetch(`${BuxinEV.API_URL}/api/payments/upload-receipt`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-      body: form,
-    });
-    const data = await res.json();
+    if (!token) throw { error: 'Please log in first.' };
+    let res;
+    try {
+      res = await fetch(`${BuxinEV.API_URL}/api/payments/upload-receipt`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+    } catch {
+      throw { error: 'Upload failed — check connection and try again.', network: true };
+    }
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) throw data;
     return data;
   },
@@ -36,7 +42,11 @@ const Payments = {
   },
 
   initPaymentPage() {
-    if (!Auth.requireAuth()) return;
+    if (!Auth.isLoggedIn()) {
+      const type = new URLSearchParams(location.search).get('type') || 'group';
+      window.location.href = `login.html?next=${encodeURIComponent(`payment.html?type=${type}`)}&msg=exists`;
+      return;
+    }
     BuxinEV.requireCountry();
 
     const user = Auth.getUser();
@@ -80,7 +90,10 @@ const Payments = {
         BuxinEV.showToast('Payment submitted! Awaiting approval.', 'success');
         window.location.href = 'waiting-approval.html';
       } catch (err) {
-        BuxinEV.showToast(err.error || 'Payment failed', 'error');
+        let msg = err.error || 'Payment failed';
+        if (err.network) msg = err.error;
+        if (err.status === 401) msg = 'Session expired — please log in again.';
+        BuxinEV.showToast(msg, 'error');
       } finally {
         btn.disabled = false;
       }

@@ -66,17 +66,42 @@ const Auth = {
   },
 
   redirectByStatus(user) {
+    const next = new URLSearchParams(window.location.search).get('next');
     if (user.role === 'admin') {
       window.location.href = 'admin-dashboard.html';
     } else if (user.status === 'active') {
-      window.location.href = user.class_type === 'individual'
-        ? 'dashboard.html'
-        : 'dashboard.html';
+      window.location.href = 'dashboard.html';
+    } else if (next) {
+      window.location.href = next;
+    } else if (user.status === 'pending') {
+      const t = user.class_type === 'individual' ? 'individual' : 'group';
+      window.location.href = `payment.html?type=${t}`;
     } else {
       window.location.href = 'waiting-approval.html';
     }
   },
+
+  handleRegisterError(err, email, paymentType) {
+    if (err.status === 409) {
+      BuxinEV.showToast('This email is already registered. Log in to continue payment.', 'info');
+      const next = encodeURIComponent(`payment.html?type=${paymentType}`);
+      setTimeout(() => {
+        window.location.href = `login.html?email=${encodeURIComponent(email)}&next=${next}`;
+      }, 1200);
+      return true;
+    }
+    return false;
+  },
 };
+
+document.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const emailEl = document.getElementById('email');
+  if (emailEl && params.get('email')) emailEl.value = params.get('email');
+  if (params.get('msg') === 'exists') {
+    BuxinEV.showToast('Account exists — log in to complete payment.', 'info');
+  }
+});
 
 document.getElementById('login-form')?.addEventListener('submit', async (e) => {
   e.preventDefault();

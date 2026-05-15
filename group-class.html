@@ -54,19 +54,13 @@
       const fd = new FormData(e.target);
       const btn = e.target.querySelector('[type=submit]');
       btn.disabled = true;
-      let profile_picture_base64 = null;
+      const email = fd.get('email');
       const file = document.getElementById('profile-file').files[0];
-      if (file) {
-        profile_picture_base64 = await new Promise((res) => {
-          const r = new FileReader();
-          r.onload = () => res(r.result);
-          r.readAsDataURL(file);
-        });
-      }
+      const profile_picture_base64 = file ? await BuxinEV.compressImageFile(file) : null;
       try {
         await Auth.register({
           full_name: fd.get('full_name'),
-          email: fd.get('email'),
+          email,
           phone: fd.get('phone'),
           city: fd.get('city'),
           password: fd.get('password'),
@@ -78,7 +72,9 @@
         });
         location.href = 'payment.html?type=group';
       } catch (err) {
-        BuxinEV.showToast(err.error || 'Registration failed', 'error');
+        if (!Auth.handleRegisterError(err, email, 'group')) {
+          BuxinEV.showToast(err.error || 'Registration failed', 'error');
+        }
       } finally { btn.disabled = false; }
     });
   </script>

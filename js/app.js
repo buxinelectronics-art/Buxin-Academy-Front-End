@@ -89,7 +89,39 @@ const BuxinEV = {
     return next;
   },
 
-  async api(endpoint, options = {}) {
+  async compressImageFile(file) {
+    if (!file || !file.type.startsWith('image/')) return null;
+    if (file.size < 400000) {
+      return new Promise((resolve) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.readAsDataURL(file);
+      });
+    }
+    return new Promise((resolve) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxW = 800;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxW) {
+          h = (h * maxW) / w;
+          w = maxW;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL('image/jpeg', 0.75));
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  },
+
+  async api(endpoint, options = {}, retries = 1) {
     const token = localStorage.getItem('buxinev_token');
     const headers = { ...(options.headers || {}) };
     if (!(options.body instanceof FormData)) {
@@ -101,8 +133,12 @@ const BuxinEV = {
     try {
       res = await fetch(`${this.API_URL}${endpoint}`, { ...options, headers });
     } catch {
+      if (retries > 0) {
+        await new Promise((r) => setTimeout(r, 2000));
+        return this.api(endpoint, options, retries - 1);
+      }
       throw {
-        error: 'Cannot reach API. Check Render URL and CORS settings.',
+        error: 'Cannot reach API. Wait 30s (server waking up) and try again.',
         network: true,
       };
     }

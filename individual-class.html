@@ -57,9 +57,10 @@
       const fd = new FormData(e.target);
       const btn = e.target.querySelector('[type=submit]');
       btn.disabled = true;
+      const email = fd.get('email');
       try {
         await Auth.register({
-          full_name: fd.get('full_name'), email: fd.get('email'), phone: fd.get('phone'),
+          full_name: fd.get('full_name'), email, phone: fd.get('phone'),
           city: fd.get('city'), password: fd.get('password'),
           country_code: BuxinEV.getCountryCode(), class_type: 'individual',
           experience_level: fd.get('experience_level'), learning_goals: fd.get('learning_goals'),
@@ -67,7 +68,11 @@
         document.getElementById('register-section').classList.add('hidden');
         document.getElementById('schedule-section').classList.remove('hidden');
         SchedulePicker.init();
-      } catch (err) { BuxinEV.showToast(err.error || 'Failed', 'error'); }
+      } catch (err) {
+        if (!Auth.handleRegisterError(err, email, 'individual')) {
+          BuxinEV.showToast(err.error || 'Failed', 'error');
+        }
+      }
       finally { btn.disabled = false; }
     });
     document.getElementById('schedule-continue').addEventListener('click', async () => {
