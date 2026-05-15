@@ -7,9 +7,13 @@ window.BUXIN_CONFIG = {
 };
 
 (function () {
+  // Force HTTPS on custom domain (http:// breaks CORS with the API)
+  if (location.protocol === 'http:' && location.hostname.endsWith('techbuxin.com')) {
+    location.replace('https://' + location.host + location.pathname + location.search);
+    return;
+  }
   const host = window.location.hostname;
   const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '';
-  // Always use production API on GitHub Pages (fixes stale localStorage URLs)
   if (!isLocal && window.BUXIN_CONFIG?.PROD_API_URL) {
     localStorage.setItem('buxinev_api', window.BUXIN_CONFIG.PROD_API_URL);
   }
