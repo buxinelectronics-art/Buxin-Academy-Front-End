@@ -89,7 +89,10 @@ document.getElementById('login-form')?.addEventListener('submit', async (e) => {
     BuxinEV.showToast('Welcome back!', 'success');
     Auth.redirectByStatus(user);
   } catch (err) {
-    BuxinEV.showToast(err.error || 'Login failed', 'error');
+    let msg = err.error || 'Login failed';
+    if (err.network) msg = err.error;
+    else if (err.status === 401) msg = 'Invalid email or password';
+    BuxinEV.showToast(msg, 'error');
   } finally {
     btn.disabled = false;
   }

@@ -97,7 +97,15 @@ const BuxinEV = {
     }
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await fetch(`${this.API_URL}${endpoint}`, { ...options, headers });
+    let res;
+    try {
+      res = await fetch(`${this.API_URL}${endpoint}`, { ...options, headers });
+    } catch {
+      throw {
+        error: 'Cannot reach API. Check Render URL and CORS settings.',
+        network: true,
+      };
+    }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw { status: res.status, ...data };
     return data;

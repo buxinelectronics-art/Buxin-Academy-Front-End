@@ -9,7 +9,8 @@ window.BUXIN_CONFIG = {
 (function () {
   const host = window.location.hostname;
   const isLocal = host === 'localhost' || host === '127.0.0.1' || host === '';
-  if (!isLocal && !localStorage.getItem('buxinev_api')) {
+  // Always use production API on GitHub Pages (fixes stale localStorage URLs)
+  if (!isLocal && window.BUXIN_CONFIG?.PROD_API_URL) {
     localStorage.setItem('buxinev_api', window.BUXIN_CONFIG.PROD_API_URL);
   }
 })();
