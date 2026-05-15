@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Group Class | Buxin Academy</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <a href="home.html" class="logo">🤖 Buxin Academy</a>
+      <div class="nav-links"><a href="home.html">Home</a><a href="login.html">Login</a></div>
+      <button id="menu-toggle">☰</button>
+    </div>
+    <div id="mobile-nav" class="container"><a href="home.html">Home</a><a href="login.html">Login</a></div>
+  </nav>
+
+  <main class="container" style="padding:2rem 1rem;max-width:640px">
+    <span class="hero-badge">Sunday Robotics · Community Learning</span>
+    <h1>Join Group Class</h1>
+    <p class="opacity-70 mb-2">Only <strong data-price-group>D362.50</strong> in your local currency</p>
+
+    <form id="group-register-form" class="glass" style="padding:1.5rem;margin-top:1.5rem">
+      <div class="form-group"><label>Full Name *</label><input type="text" name="full_name" required></div>
+      <div class="form-group"><label>Email *</label><input type="email" name="email" required></div>
+      <div class="form-group"><label>Phone Number *</label><input type="tel" name="phone" required></div>
+      <div class="form-group"><label>Country</label><input type="text" id="country-display" readonly class="opacity-70"></div>
+      <div class="form-group"><label>City *</label><input type="text" name="city" required></div>
+      <div class="form-group"><label>Password *</label><input type="password" name="password" required minlength="6"></div>
+      <div class="form-group">
+        <label>Robotics Experience</label>
+        <select name="experience_level">
+          <option>Beginner</option>
+          <option>Intermediate</option>
+          <option>Advanced</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Learning Goals</label><textarea name="learning_goals" rows="3" placeholder="What do you want to build?"></textarea></div>
+      <div class="form-group"><label>Profile Picture</label><input type="file" name="profile" accept="image/*" id="profile-file"></div>
+      <button type="submit" class="btn btn-primary btn-block">Register &amp; Pay</button>
+    </form>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/auth.js"></script>
+  <script>
+    if (!localStorage.getItem('buxinev_country')) location.href = 'index.html';
+    document.getElementById('country-display').value = BuxinEV.getCountry().name;
+    document.getElementById('group-register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const btn = e.target.querySelector('[type=submit]');
+      btn.disabled = true;
+      let profile_picture_base64 = null;
+      const file = document.getElementById('profile-file').files[0];
+      if (file) {
+        profile_picture_base64 = await new Promise((res) => {
+          const r = new FileReader();
+          r.onload = () => res(r.result);
+          r.readAsDataURL(file);
+        });
+      }
+      try {
+        await Auth.register({
+          full_name: fd.get('full_name'),
+          email: fd.get('email'),
+          phone: fd.get('phone'),
+          city: fd.get('city'),
+          password: fd.get('password'),
+          country_code: BuxinEV.getCountryCode(),
+          class_type: 'group',
+          experience_level: fd.get('experience_level'),
+          learning_goals: fd.get('learning_goals'),
+          profile_picture_base64,
+        });
+        location.href = 'payment.html?type=group';
+      } catch (err) {
+        BuxinEV.showToast(err.error || 'Registration failed', 'error');
+      } finally { btn.disabled = false; }
+    });
+  </script>
+</body>
+</html>
+
+
+

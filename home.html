@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Buxin Academy — Robotics classes">
+  <title>Buxin Academy</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+</head>
+<body class="home-simple">
+  <nav class="navbar">
+    <div class="container">
+      <a href="home.html" class="logo">🤖 Buxin Academy</a>
+      <div class="nav-links">
+        <a href="login.html">Login</a>
+      </div>
+      <div class="nav-actions">
+        <button id="theme-toggle" aria-label="Toggle theme">🌙</button>
+        <button id="menu-toggle" aria-label="Menu">☰</button>
+      </div>
+    </div>
+    <div id="mobile-nav" class="container">
+      <a href="login.html">Login</a>
+    </div>
+  </nav>
+
+  <main class="home-main container">
+    <p class="home-country-line text-sm opacity-70">
+      <span data-country-flag>🇬🇲</span>
+      <span data-country-name>The Gambia</span>
+    </p>
+
+    <h1 class="section-title home-pricing-title">Learning Robotics &amp; AI</h1>
+
+    <div class="pricing-grid home-pricing-grid">
+      <article class="pricing-card glass home-class-card">
+        <h2>Group Class</h2>
+        <p class="home-card-note">Sundays</p>
+        <p class="price" data-price-group>D362.50</p>
+        <a href="group-class.html" class="btn btn-primary btn-block">Register</a>
+      </article>
+
+      <article class="pricing-card glass home-class-card">
+        <h2>Individual Class</h2>
+        <p class="home-card-note">One-on-one</p>
+        <p class="price" data-price-individual>D7,250.00</p>
+        <a href="individual-class.html" class="btn btn-primary btn-block">Register</a>
+      </article>
+    </div>
+  </main>
+
+  <section id="faq" class="home-faq">
+    <div class="container" style="max-width:700px">
+      <h2 class="section-title">FAQ</h2>
+      <details class="faq-item">
+        <summary>How do I pay?</summary>
+        <p>Register, pay with your local method, then upload your receipt. Admin will approve your access.</p>
+      </details>
+      <details class="faq-item">
+        <summary>When are group classes?</summary>
+        <p>Every Sunday. You get the class link in your dashboard after approval.</p>
+      </details>
+      <details class="faq-item">
+        <summary>Can I change my country?</summary>
+        <p>Go back to the country page from settings or clear site data and select again.</p>
+      </details>
+    </div>
+  </section>
+
+  <footer class="footer footer-minimal">
+    <div class="container">
+      <p>© 2026 Buxin Academy</p>
+    </div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    if (!localStorage.getItem('buxinev_country')) location.href = 'index.html';
+    BuxinEV.updatePriceElements();
+  </script>
+</body>
+</html>
+
+

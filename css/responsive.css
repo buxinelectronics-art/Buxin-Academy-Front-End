@@ -1,0 +1,66 @@
+/* Buxin Academy — Responsive */
+
+@media (min-width: 768px) {
+  .nav-links { display: flex; }
+  #menu-toggle { display: none; }
+  #mobile-nav { display: none !important; }
+}
+
+@media (max-width: 767px) {
+  .hero { padding: 2rem 0 3rem; }
+  .pricing-card { padding: 1.5rem; }
+  .dashboard-layout { grid-template-columns: 1fr; }
+  .sidebar {
+    position: static;
+    display: flex;
+    overflow-x: auto;
+    padding: 1rem;
+  }
+  .sidebar-nav { display: flex; gap: 0.5rem; }
+  .sidebar-nav li { margin: 0; white-space: nowrap; }
+
+  /* Responsive tables */
+  table thead { display: none; }
+  table tr {
+    display: block;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  table td {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.4rem 0;
+    border: none;
+  }
+  table td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: var(--text-muted);
+    margin-right: 1rem;
+  }
+
+  .admin-tabs { overflow-x: auto; flex-wrap: nowrap; }
+  .stat-grid { grid-template-columns: repeat(2, 1fr); }
+  .payment-methods { grid-template-columns: 1fr 1fr; }
+  .hero-cta .btn { width: 100%; }
+}
+
+@media (max-width: 380px) {
+  .logo { font-size: 1rem; }
+  .btn { padding: 0.65rem 1rem; font-size: 0.9rem; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Low bandwidth: lazy load hint */
+img[loading="lazy"] { content-visibility: auto; }
+

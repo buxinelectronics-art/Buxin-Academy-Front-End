@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login | Buxin Academy</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <nav class="navbar"><div class="container"><a href="home.html" class="logo">🤖 Buxin Academy</a></div></nav>
+  <main class="country-gate">
+    <div class="country-card glass" style="max-width:420px">
+      <h1>Welcome Back</h1>
+      <p class="opacity-70 mb-4">Sign in to your robotics dashboard</p>
+      <form id="login-form">
+        <div class="form-group"><label>Email</label><input type="email" id="email" required autocomplete="email"></div>
+        <div class="form-group"><label>Password</label><input type="password" id="password" required autocomplete="current-password"></div>
+        <button type="submit" class="btn btn-primary btn-block">Login</button>
+      </form>
+      <p class="mt-3 text-sm opacity-70">No account? <a href="register.html">Register</a></p>
+    </div>
+  </main>
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/auth.js"></script>
+  <script>if (!localStorage.getItem('buxinev_country')) location.href = 'index.html';</script>
+</body>
+</html>
+
+
+
