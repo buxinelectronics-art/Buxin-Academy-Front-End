@@ -373,7 +373,11 @@ section { padding: 3rem 0; }
   text-align: center;
   margin: 1rem 0;
 }
-.receipt-thumb { max-width: 120px; border-radius: 8px; border: 1px solid var(--border); }
+.receipt-thumb { max-width: 120px; max-height: 100px; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); }
+.receipt-link { display: inline-block; }
+.class-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 999px; font-size: 0.75rem; font-weight: 700; }
+.group-badge { background: rgba(0, 212, 170, 0.2); color: var(--primary); }
+.individual-badge { background: rgba(124, 58, 237, 0.25); color: #a78bfa; }
 #receipt-preview { max-width: 200px; margin: 1rem auto; border-radius: 8px; }
 
 /* Community */

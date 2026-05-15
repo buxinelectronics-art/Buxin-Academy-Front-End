@@ -40,12 +40,17 @@
           <option value="GH">Ghana</option>
           <option value="KE">Kenya</option>
         </select>
+        <select id="payment-class-filter" class="input" style="width:auto;margin:0">
+          <option value="">All classes</option>
+          <option value="group">Group only</option>
+          <option value="individual">Individual only</option>
+        </select>
       </div>
       <div class="table-wrap glass" style="padding:1rem">
         <table>
           <thead>
             <tr>
-              <th>Student</th><th>Email</th><th>Country</th><th>Method</th>
+              <th>Student</th><th>Email</th><th>Class</th><th>Country</th><th>Method</th>
               <th>Receipt</th><th>Status</th><th>Date</th><th>Actions</th>
             </tr>
           </thead>
@@ -64,10 +69,15 @@
           <option value="">All countries</option>
           <option value="GM">GM</option><option value="NG">NG</option><option value="KE">KE</option>
         </select>
+        <select id="filter-class" class="input" style="width:auto;margin:0">
+          <option value="">All classes</option>
+          <option value="group">Group only</option>
+          <option value="individual">Individual only</option>
+        </select>
       </div>
       <div class="table-wrap glass" style="padding:1rem">
         <table>
-          <thead><tr><th>Name</th><th>Email</th><th>Country</th><th>Class</th><th>Status</th><th>Date</th></tr></thead>
+          <thead><tr><th>Photo</th><th>Name</th><th>Email</th><th>Country</th><th>Class</th><th>Status</th><th>Date</th></tr></thead>
           <tbody id="students-table"></tbody>
         </table>
       </div>

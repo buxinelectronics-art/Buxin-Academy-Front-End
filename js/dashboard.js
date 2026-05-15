@@ -172,6 +172,9 @@ const WaitingPage = {
         if (img && p.receipt_url) {
           img.src = p.receipt_url;
           img.classList.remove('hidden');
+          img.onerror = () => {
+            img.alt = 'Receipt on file — open from email if image does not load';
+          };
         }
       }
     } catch { /* silent */ }

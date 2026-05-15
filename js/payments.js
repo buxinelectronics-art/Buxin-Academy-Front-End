@@ -1,4 +1,28 @@
 const Payments = {
+  _submitting: false,
+
+  async submitWithReceipt(classType, method, file) {
+    const form = new FormData();
+    form.append('class_type', classType);
+    form.append('payment_method', method);
+    form.append('receipt', file);
+    const token = localStorage.getItem('buxinev_token');
+    if (!token) throw { error: 'Please log in first.' };
+    let res;
+    try {
+      res = await fetch(`${BuxinEV.API_URL}/api/payments/submit`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+    } catch {
+      throw { error: 'Cannot reach API. Wait and try again.', network: true };
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw data;
+    return data;
+  },
+
   async createPayment(classType, method) {
     return BuxinEV.api('/api/payments', {
       method: 'POST',
@@ -31,6 +55,7 @@ const Payments = {
   },
 
   renderPaymentMethods(container) {
+    if (!container) return;
     const methods = BuxinEV.getCountry().payment_methods || [];
     container.innerHTML = methods.map(m => `
       <label class="payment-method-card">
@@ -80,22 +105,26 @@ const Payments = {
 
     document.getElementById('payment-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (this._submitting) return;
       const btn = e.target.querySelector('[type=submit]');
+      const method = document.querySelector('input[name=payment_method]:checked')?.value;
+      const file = document.getElementById('receipt-file')?.files[0];
+      if (!method) { BuxinEV.showToast('Select a payment method', 'error'); return; }
+      if (!file) { BuxinEV.showToast('Upload receipt', 'error'); return; }
+
+      this._submitting = true;
       btn.disabled = true;
       try {
-        const method = document.querySelector('input[name=payment_method]:checked')?.value;
-        await this.createPayment(classType, method);
-        const file = document.getElementById('receipt-file')?.files[0];
-        if (file) await this.uploadReceipt(file);
-        BuxinEV.showToast('Payment submitted! Awaiting approval.', 'success');
-        window.location.href = 'waiting-approval.html';
+        await this.submitWithReceipt(classType, method, file);
+        BuxinEV.showToast('Submitted! Waiting for approval.', 'success');
+        window.location.replace('waiting-approval.html');
       } catch (err) {
+        this._submitting = false;
+        btn.disabled = false;
         let msg = err.error || 'Payment failed';
         if (err.network) msg = err.error;
-        if (err.status === 401) msg = 'Session expired — please log in again.';
+        if (err.status === 401) msg = 'Session expired — log in again.';
         BuxinEV.showToast(msg, 'error');
-      } finally {
-        btn.disabled = false;
       }
     });
   },
@@ -104,4 +133,3 @@ const Payments = {
 document.addEventListener('DOMContentLoaded', () => {
   if (document.getElementById('payment-form')) Payments.initPaymentPage();
 });
-

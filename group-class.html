@@ -20,9 +20,10 @@
   <main class="container" style="padding:2rem 1rem;max-width:640px">
     <span class="hero-badge">Sunday Robotics · Community Learning</span>
     <h1>Join Group Class</h1>
-    <p class="opacity-70 mb-2">Only <strong data-price-group>D362.50</strong> in your local currency</p>
+    <p class="opacity-70 mb-2">Only <strong data-price-group>D362.50</strong> — pay &amp; upload receipt below</p>
 
     <form id="group-register-form" class="glass" style="padding:1.5rem;margin-top:1.5rem">
+      <h2 class="text-sm mb-3" style="color:var(--primary)">Your details</h2>
       <div class="form-group"><label>Full Name *</label><input type="text" name="full_name" required></div>
       <div class="form-group"><label>Email *</label><input type="email" name="email" required></div>
       <div class="form-group"><label>Phone Number *</label><input type="tel" name="phone" required></div>
@@ -37,49 +38,91 @@
           <option>Advanced</option>
         </select>
       </div>
-      <div class="form-group"><label>Learning Goals</label><textarea name="learning_goals" rows="3" placeholder="What do you want to build?"></textarea></div>
-      <div class="form-group"><label>Profile Picture</label><input type="file" name="profile" accept="image/*" id="profile-file"></div>
-      <button type="submit" class="btn btn-primary btn-block">Register &amp; Pay</button>
+      <div class="form-group"><label>Learning Goals</label><textarea name="learning_goals" rows="2"></textarea></div>
+      <div class="form-group"><label>Profile Picture (optional)</label><input type="file" accept="image/*" id="profile-file"></div>
+
+      <hr style="border-color:var(--border);margin:1.5rem 0">
+
+      <h2 class="text-sm mb-3" style="color:var(--primary)">Payment</h2>
+      <p class="payment-amount" data-price-group style="font-size:1.75rem;margin-bottom:1rem">D362.50</p>
+      <div id="payment-methods" class="payment-methods"></div>
+      <div class="form-group">
+        <label>Upload payment receipt *</label>
+        <input type="file" id="receipt-file" accept="image/*" capture="environment" required>
+        <img id="receipt-preview" class="hidden receipt-thumb mt-2" alt="Receipt preview">
+      </div>
+
+      <button type="submit" id="submit-btn" class="btn btn-primary btn-block btn-lg">Register &amp; Submit for Approval</button>
+      <p id="form-status" class="text-sm text-center mt-2 opacity-70"></p>
     </form>
   </main>
 
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/payments.js"></script>
   <script>
     if (!localStorage.getItem('buxinev_country')) location.href = 'index.html';
     document.getElementById('country-display').value = BuxinEV.getCountry().name;
+    BuxinEV.updatePriceElements();
+    Payments.renderPaymentMethods(document.getElementById('payment-methods'));
+
+    document.getElementById('receipt-file').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      const preview = document.getElementById('receipt-preview');
+      if (file && preview) {
+        preview.src = URL.createObjectURL(file);
+        preview.classList.remove('hidden');
+      }
+    });
+
+    let submitting = false;
     document.getElementById('group-register-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      if (submitting) return;
       const fd = new FormData(e.target);
-      const btn = e.target.querySelector('[type=submit]');
-      btn.disabled = true;
       const email = fd.get('email');
+      const btn = document.getElementById('submit-btn');
+      const status = document.getElementById('form-status');
+      const method = document.querySelector('input[name=payment_method]:checked')?.value;
+      const receipt = document.getElementById('receipt-file').files[0];
+
+      if (!method) { BuxinEV.showToast('Select a payment method', 'error'); return; }
+      if (!receipt) { BuxinEV.showToast('Upload your payment receipt', 'error'); return; }
+
+      submitting = true;
+      btn.disabled = true;
+      status.textContent = 'Please wait…';
+
       const file = document.getElementById('profile-file').files[0];
       const profile_picture_base64 = file ? await BuxinEV.compressImageFile(file) : null;
+
       try {
-        await Auth.register({
-          full_name: fd.get('full_name'),
-          email,
-          phone: fd.get('phone'),
-          city: fd.get('city'),
-          password: fd.get('password'),
-          country_code: BuxinEV.getCountryCode(),
-          class_type: 'group',
-          experience_level: fd.get('experience_level'),
-          learning_goals: fd.get('learning_goals'),
-          profile_picture_base64,
-        });
-        location.href = 'payment.html?type=group';
-      } catch (err) {
-        if (!Auth.handleRegisterError(err, email, 'group')) {
-          BuxinEV.showToast(err.error || 'Registration failed', 'error');
+        if (!Auth.isLoggedIn()) {
+          await Auth.register({
+            full_name: fd.get('full_name'), email, phone: fd.get('phone'),
+            city: fd.get('city'), password: fd.get('password'),
+            country_code: BuxinEV.getCountryCode(), class_type: 'group',
+            experience_level: fd.get('experience_level'),
+            learning_goals: fd.get('learning_goals'),
+            profile_picture_base64,
+          });
         }
-      } finally { btn.disabled = false; }
+        await Payments.submitWithReceipt('group', method, receipt);
+        BuxinEV.showToast('Submitted! Waiting for admin approval.', 'success');
+        status.textContent = 'Redirecting…';
+        setTimeout(() => { window.location.replace('waiting-approval.html'); }, 800);
+      } catch (err) {
+        submitting = false;
+        btn.disabled = false;
+        status.textContent = '';
+        if (!Auth.handleRegisterError(err, email, 'group')) {
+          BuxinEV.showToast(err.error || 'Submission failed', 'error');
+        }
+      }
     });
   </script>
 </body>
 </html>
-
 
 
