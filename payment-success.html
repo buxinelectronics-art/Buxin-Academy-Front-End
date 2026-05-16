@@ -1,34 +1,154 @@
 <!DOCTYPE html>
+
 <html lang="en" data-theme="dark">
+
 <head>
+
   <meta charset="UTF-8">
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <title>Payment successful | Buxin Academy</title>
+
   <link rel="stylesheet" href="css/style.css">
+
   <link rel="stylesheet" href="css/responsive.css">
+
 </head>
+
 <body data-page="waiting">
+
   <main class="waiting-hero container">
-    <div class="waiting-icon">✅</div>
-    <h1>Payment successful</h1>
-    <p class="opacity-70">Your account is active. Redirecting to your dashboard…</p>
+
+    <div class="waiting-icon" id="status-icon">⏳</div>
+
+    <h1 id="status-title">Confirming payment…</h1>
+
+    <p class="opacity-70" id="status-msg">Please wait while we activate your account.</p>
+
   </main>
+
   <script src="js/config.js"></script>
+
   <script src="js/app.js"></script>
+
   <script src="js/auth.js"></script>
+
   <script>
+
     (async () => {
+
+      const params = new URLSearchParams(location.search);
+
+      const paymentId = params.get('payment_id');
+
+      const transactionId = params.get('transaction_id')
+
+        || params.get('intent')
+
+        || params.get('id');
+
+
+
+      const setStatus = (icon, title, msg) => {
+
+        document.getElementById('status-icon').textContent = icon;
+
+        document.getElementById('status-title').textContent = title;
+
+        document.getElementById('status-msg').textContent = msg;
+
+      };
+
+
+
       if (!Auth.isLoggedIn()) {
-        location.href = 'login.html';
+
+        const next = encodeURIComponent(location.pathname + location.search);
+
+        location.href = `login.html?next=${next}`;
+
         return;
+
       }
-      const user = await Auth.refreshUser();
+
+
+
+      let user = await Auth.refreshUser();
+
+
+
       if (user?.status === 'active') {
-        setTimeout(() => { location.href = 'dashboard.html'; }, 1200);
-      } else {
-        location.href = 'waiting-approval.html';
+
+        setStatus('✅', 'Payment successful', 'Your account is active. Opening dashboard…');
+
+        setTimeout(() => { location.href = 'dashboard.html'; }, 1500);
+
+        return;
+
       }
+
+
+
+      if (paymentId && transactionId) {
+
+        try {
+
+          const result = await BuxinEV.api('/api/payments/modempay/verify', {
+
+            method: 'POST',
+
+            body: JSON.stringify({
+
+              payment_id: parseInt(paymentId, 10),
+
+              transaction_id: String(transactionId),
+
+            }),
+
+          });
+
+          if (result.user) {
+
+            Auth.saveSession(localStorage.getItem('buxinev_token'), result.user);
+
+            user = result.user;
+
+          }
+
+        } catch (err) {
+
+          console.warn('Verify on return:', err);
+
+        }
+
+      }
+
+
+
+      user = await Auth.refreshUser();
+
+      if (user?.status === 'active') {
+
+        setStatus('✅', 'Payment successful', 'Welcome to Buxin Academy! Opening dashboard…');
+
+        setTimeout(() => { location.href = 'dashboard.html'; }, 1500);
+
+        return;
+
+      }
+
+
+
+      setStatus('⏳', 'Payment received', 'Your payment is being confirmed. You can check back shortly.');
+
+      setTimeout(() => { location.href = 'waiting-approval.html'; }, 2500);
+
     })();
+
   </script>
+
 </body>
+
 </html>
+

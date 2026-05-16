@@ -158,8 +158,6 @@
         }
         if (BuxinModemPay.isInstantMethod(method)) {
           await Payments.handleInstantPay('group', method);
-          BuxinEV.showToast('Payment successful! Welcome to Buxin Academy.', 'success');
-          window.location.replace('dashboard.html');
           return;
         }
         if (!receipt?.size) {

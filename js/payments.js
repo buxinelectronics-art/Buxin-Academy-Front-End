@@ -120,7 +120,10 @@ const Payments = {
     BuxinEV.showToast(`Opening Modem Pay (${method})…`, 'info');
     try {
       const result = await BuxinModemPay.startInstantPay(classType, method);
-      Auth.saveSession(localStorage.getItem('buxinev_token'), result.user);
+      if (result?.redirect) return;
+      if (result?.user) {
+        Auth.saveSession(localStorage.getItem('buxinev_token'), result.user);
+      }
       BuxinEV.showToast('Payment successful! Welcome to Buxin Academy.', 'success');
       window.location.replace('dashboard.html');
     } catch (err) {
