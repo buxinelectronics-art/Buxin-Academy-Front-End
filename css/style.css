@@ -147,8 +147,20 @@ label { display: block; margin-bottom: 0.35rem; font-size: 0.9rem; color: var(--
 .student-nav-menu a:hover,
 .student-nav-menu a.active { background: rgba(0, 212, 170, 0.12); color: var(--accent); }
 
-#post-form.is-submitting { opacity: 0.85; pointer-events: none; }
-#post-form.is-submitting [type=submit] { cursor: wait; }
+#post-form.is-submitting { pointer-events: none; }
+#post-form.is-submitting [type=submit] { cursor: wait; opacity: 0.9; }
+.post-upload-status {
+  font-size: 0.85rem;
+  color: var(--accent);
+  margin: 0.5rem 0 0;
+}
+.post-upload-status.hidden { display: none; }
+.post-card.post-pending { opacity: 0.92; border-style: dashed; }
+.post-card.post-pending .pending-label {
+  font-size: 0.75rem;
+  color: var(--accent);
+  margin-bottom: 0.35rem;
+}
 
 .comment-section .btn-primary { flex-shrink: 0; min-width: 4.5rem; }
 .logo {

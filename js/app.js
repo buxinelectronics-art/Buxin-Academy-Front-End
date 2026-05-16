@@ -162,6 +162,75 @@ const BuxinEV = {
     return this.compressReceiptFile(file);
   },
 
+  /** Small JPEG blob for fast community uploads (max 1024px). */
+  async compressImageToBlob(file, { maxWidth = 1024, quality = 0.8 } = {}) {
+    if (!file) return null;
+    if (!this.isImageFile(file)) {
+      throw { error: 'Photo must be JPG or PNG.' };
+    }
+    const dataUrl = await this.compressReceiptFile(file);
+    const blob = await this.dataUrlToBlob(dataUrl);
+    if (blob.size > 900000) {
+      return this._compressFileToJpegBlob(file, maxWidth, Math.min(quality, 0.72));
+    }
+    return blob;
+  },
+
+  async _compressFileToJpegBlob(file, maxWidth, quality) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let w = img.width;
+        let h = img.height;
+        if (!w || !h) {
+          URL.revokeObjectURL(url);
+          reject(new Error('invalid image'));
+          return;
+        }
+        if (w > maxWidth) {
+          h = (h * maxWidth) / w;
+          w = maxWidth;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        canvas.toBlob(
+          (blob) => (blob ? resolve(blob) : reject(new Error('compress failed'))),
+          'image/jpeg',
+          quality,
+        );
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('image load failed'));
+      };
+      img.src = url;
+    });
+  },
+
+  async fetchUploadWithRetry(url, options = {}, maxAttempts = 3) {
+    const backoffMs = [2000, 4000];
+    let lastError = null;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) {
+        await new Promise((r) => setTimeout(r, backoffMs[attempt - 1] || 4000));
+      }
+      try {
+        const res = await fetch(url, options);
+        if ([502, 503, 504].includes(res.status) && attempt < maxAttempts - 1) {
+          continue;
+        }
+        return res;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+    throw lastError;
+  },
+
   async apiMultipart(endpoint, formData, method = 'POST') {
     const token = localStorage.getItem('buxinev_token');
     const headers = {};
@@ -169,14 +238,14 @@ const BuxinEV = {
     if (token) await this.ensureAwake();
     let res;
     try {
-      res = await this.fetchWithColdStartRetry(`${this.API_URL}${endpoint}`, {
+      res = await this.fetchUploadWithRetry(`${this.API_URL}${endpoint}`, {
         method,
         headers,
         body: formData,
-      });
+      }, 3);
     } catch {
       throw {
-        error: 'Cannot reach API — wait a moment and try again.',
+        error: 'Upload failed — check your connection and try again.',
         network: true,
       };
     }

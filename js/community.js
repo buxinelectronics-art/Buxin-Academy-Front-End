@@ -2,6 +2,8 @@ const Community = {
   socket: null,
   _posting: false,
   _previewUrl: null,
+  _compressedBlob: null,
+  _compressing: false,
 
   canUse(user) {
     return user && (user.role === 'admin' || user.status === 'active');
@@ -60,7 +62,10 @@ const Community = {
     });
 
     document.getElementById('post-image')?.addEventListener('change', (e) => {
-      this.setImagePreview(e.target.files?.[0]);
+      const file = e.target.files?.[0];
+      this.setImagePreview(file);
+      this._compressedBlob = null;
+      if (file) void this.prepareImageInBackground(file);
     });
 
     const feed = document.getElementById('community-feed');
@@ -105,13 +110,62 @@ const Community = {
     }
   },
 
+  setUploadStatus(text) {
+    const el = document.getElementById('post-upload-status');
+    if (!el) return;
+    if (text) {
+      el.textContent = text;
+      el.classList.remove('hidden');
+    } else {
+      el.textContent = '';
+      el.classList.add('hidden');
+    }
+  },
+
+  async prepareImageInBackground(file) {
+    if (this._compressing) return;
+    this._compressing = true;
+    try {
+      this._compressedBlob = await BuxinEV.compressImageToBlob(file);
+      this.setUploadStatus('Photo ready to post');
+    } catch {
+      this._compressedBlob = null;
+    } finally {
+      this._compressing = false;
+    }
+  },
+
   clearPostForm() {
     const form = document.getElementById('post-form');
     form?.reset();
     const imgInput = document.getElementById('post-image');
     if (imgInput) imgInput.value = '';
     this.setImagePreview(null);
+    this._compressedBlob = null;
+    this.setUploadStatus('');
     form?.classList.remove('is-submitting');
+  },
+
+  prependPendingPost({ pendingId, content, localImageUrl }) {
+    const user = Auth.getUser();
+    const feed = document.getElementById('community-feed');
+    if (!feed) return;
+    feed.querySelector('.empty-state')?.remove();
+    const html = `
+      <article class="post-card glass post-pending" data-pending-id="${pendingId}">
+        <p class="pending-label">Uploading your post…</p>
+        <header class="post-header">
+          <div class="avatar-sm">${user?.full_name?.[0] || '?'}</div>
+          <div><strong>${this.escape(user?.full_name || 'You')}</strong><small>Just now</small></div>
+        </header>
+        ${content ? `<p class="post-content">${this.escape(content)}</p>` : ''}
+        ${localImageUrl ? `<img src="${localImageUrl}" alt="" class="post-image">` : ''}
+      </article>`;
+    feed.insertAdjacentHTML('afterbegin', html);
+  },
+
+  removePendingPost(pendingId) {
+    document.querySelector(`[data-pending-id="${pendingId}"]`)?.remove();
   },
 
   async submitPost(e) {
@@ -127,39 +181,60 @@ const Community = {
       return;
     }
 
-    const btn = form.querySelector('[type=submit]');
-    const prevLabel = btn?.textContent;
+    const btn = document.getElementById('post-submit-btn') || form.querySelector('[type=submit]');
+    const prevLabel = btn?.textContent || 'Post';
+    const pendingId = `pending-${Date.now()}`;
+    let localPreviewUrl = null;
+
     this._posting = true;
     if (btn) {
       btn.disabled = true;
-      btn.textContent = 'Posting…';
+      btn.textContent = file ? 'Preparing…' : 'Posting…';
     }
     form.classList.add('is-submitting');
 
     try {
       let result;
       if (file) {
+        this.setUploadStatus('Preparing photo (smaller size for faster upload)…');
+        const wake = BuxinEV.ensureAwake();
+        let blob = this._compressedBlob;
+        if (!blob) {
+          blob = await BuxinEV.compressImageToBlob(file);
+          this._compressedBlob = blob;
+        }
+        await wake;
+        localPreviewUrl = URL.createObjectURL(blob);
+        this.prependPendingPost({ pendingId, content, localImageUrl: localPreviewUrl });
+        this.setUploadStatus('Uploading to server…');
+        if (btn) btn.textContent = 'Uploading…';
+
         const fd = new FormData();
         fd.append('content', content);
-        fd.append('image', file, file.name || 'photo.jpg');
+        fd.append('image', blob, 'photo.jpg');
         result = await BuxinEV.apiMultipart('/api/community/posts', fd);
       } else {
+        this.setUploadStatus('Sending…');
         result = await BuxinEV.api('/api/community/posts', {
           method: 'POST',
           body: JSON.stringify({ content }),
         });
       }
 
+      this.removePendingPost(pendingId);
       this.clearPostForm();
       if (result?.post) this.prependPost(result.post);
       BuxinEV.showToast('Post shared!', 'success');
     } catch (err) {
+      this.removePendingPost(pendingId);
       BuxinEV.showToast(err.error || 'Failed to post', 'error');
+      this.setUploadStatus('');
     } finally {
+      if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
       this._posting = false;
       if (btn) {
         btn.disabled = false;
-        btn.textContent = prevLabel || 'Post';
+        btn.textContent = prevLabel;
       }
       form.classList.remove('is-submitting');
     }
