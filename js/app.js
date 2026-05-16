@@ -89,6 +89,38 @@ const BuxinEV = {
     return next;
   },
 
+  /** Compress receipt images for upload (always JPEG, max 1200px). */
+  async compressReceiptFile(file) {
+    if (!file) return null;
+    if (!file.type.startsWith('image/')) {
+      throw { error: 'Receipt must be an image (JPG or PNG).' };
+    }
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const maxW = 1200;
+        let w = img.width;
+        let h = img.height;
+        if (w > maxW) {
+          h = (h * maxW) / w;
+          w = maxW;
+        }
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject({ error: 'Could not read receipt image. Try another file.' });
+      };
+      img.src = url;
+    });
+  },
+
   async compressImageFile(file) {
     if (!file || !file.type.startsWith('image/')) return null;
     if (file.size < 400000) {

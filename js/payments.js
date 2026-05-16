@@ -2,36 +2,35 @@ const Payments = {
   _submitting: false,
 
   async submitWithReceipt(classType, method, file) {
-    const form = new FormData();
-    form.append('class_type', classType);
-    form.append('payment_method', method);
-    form.append('receipt', file);
-    const token = localStorage.getItem('buxinev_token');
-    if (!token) throw { error: 'Please log in first.' };
-    let res;
-    try {
-      res = await BuxinEV.fetchWithColdStartRetry(`${BuxinEV.API_URL}/api/payments/submit`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: form,
-      });
-    } catch {
-      throw {
-        error:
-          'Cannot reach API — try again in a minute if the server was sleeping (free hosting).',
-        network: true,
-      };
+    if (!localStorage.getItem('buxinev_token')) {
+      throw { error: 'Please log in first.' };
     }
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = { status: res.status, ...data };
+    const receipt_base64 = await BuxinEV.compressReceiptFile(file);
+    if (!receipt_base64) {
+      throw { error: 'Could not read receipt image. Use JPG or PNG under 5MB.' };
+    }
+    try {
+      return await BuxinEV.api('/api/payments/submit', {
+        method: 'POST',
+        body: JSON.stringify({
+          class_type: classType,
+          payment_method: method,
+          receipt_base64,
+        }),
+      });
+    } catch (err) {
       if (Auth.isAuthError(err)) {
         Auth.clearSession();
-        err.error = 'Session expired — please log in and submit your receipt again.';
+        throw {
+          ...err,
+          error: 'Session expired — log in and submit your receipt again.',
+        };
+      }
+      if (err.status === 413) {
+        throw { error: 'Receipt file is too large. Try a smaller screenshot.' };
       }
       throw err;
     }
-    return data;
   },
 
   async createPayment(classType, method) {
@@ -130,14 +129,18 @@ const Payments = {
       this._submitting = true;
       btn.disabled = true;
       try {
-        await this.submitWithReceipt(classType, method, file);
+        const result = await this.submitWithReceipt(classType, method, file);
+        if (result?.upload_warning) {
+          BuxinEV.showToast('Payment saved. Admin may ask for a clearer receipt if needed.', 'info');
+        }
         BuxinEV.showToast('Submitted! Waiting for approval.', 'success');
         window.location.replace('waiting-approval.html');
       } catch (err) {
         this._submitting = false;
         btn.disabled = false;
-        let msg = err.error || 'Payment failed';
+        let msg = err.error || err.message || 'Payment failed';
         if (err.network) msg = err.error;
+        if (err.upload_warning) BuxinEV.showToast(err.upload_warning, 'info');
         if (Auth.isAuthError(err)) {
           msg = err.error || 'Session expired — log in and try again.';
           setTimeout(() => {

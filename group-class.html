@@ -120,7 +120,10 @@
             profile_picture_base64,
           });
         }
-        await Payments.submitWithReceipt('group', method, receipt);
+        const payResult = await Payments.submitWithReceipt('group', method, receipt);
+        if (payResult?.upload_warning) {
+          BuxinEV.showToast('Registered. Admin may ask for a clearer receipt if needed.', 'info');
+        }
         BuxinEV.showToast('Submitted! Waiting for admin approval.', 'success');
         status.textContent = 'Redirecting…';
         setTimeout(() => { window.location.replace('waiting-approval.html'); }, 800);
@@ -132,7 +135,8 @@
           Auth.clearSession();
           BuxinEV.showToast('Session expired — submit the form again.', 'error');
         } else if (!Auth.handleRegisterError(err, email, 'group')) {
-          BuxinEV.showToast(err.error || 'Submission failed', 'error');
+          const msg = err.error || err.message || 'Submission failed';
+          BuxinEV.showToast(msg, 'error');
         }
       }
     });
