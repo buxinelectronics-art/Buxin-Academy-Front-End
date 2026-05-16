@@ -366,6 +366,17 @@ section { padding: 3rem 0; }
   background: rgba(0, 212, 170, 0.08);
 }
 .payment-method-card input { display: none; }
+button.payment-method-card.instant-pay-btn {
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  background: var(--card);
+}
+button.payment-method-card.instant-pay-btn:hover {
+  border-color: var(--primary);
+  background: rgba(0, 212, 170, 0.08);
+}
+.instant-methods { margin-bottom: 1rem; }
 .payment-amount {
   font-size: 2.5rem;
   font-weight: 800;

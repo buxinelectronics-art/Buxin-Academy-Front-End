@@ -13,34 +13,33 @@
     <h1>Complete Payment</h1>
     <p id="class-type-label" class="opacity-70">Group Robotics Class</p>
     <p class="payment-amount" id="payment-amount">—</p>
-    <p class="text-sm text-center opacity-70 mb-4">Pay using one of the methods below, then upload your receipt</p>
+    <p id="payment-intro" class="text-sm text-center opacity-70 mb-4">Choose how you want to pay</p>
 
     <form id="payment-form" class="glass" style="padding:1.5rem">
-      <h3 class="mb-3">Select Payment Method</h3>
       <div id="payment-methods" class="payment-methods"></div>
 
-      <h3 class="mt-4 mb-2">Payment Instructions</h3>
-      <ol class="text-sm opacity-70" style="padding-left:1.2rem;margin-bottom:1rem">
-        <li>Send the exact amount shown above</li>
-        <li>Take a screenshot of your confirmation</li>
-        <li>Upload the receipt below</li>
-        <li>Wait for admin approval (usually 24 hours)</li>
-      </ol>
+      <div id="manual-receipt-block">
+        <h3 class="mt-4 mb-2">Payment Instructions</h3>
+        <ol class="text-sm opacity-70" style="padding-left:1.2rem;margin-bottom:1rem">
+          <li>Send the exact amount shown above</li>
+          <li>Take a screenshot of your confirmation</li>
+          <li>Upload the receipt below</li>
+          <li>Wait for admin approval (usually 24 hours)</li>
+        </ol>
 
-      <div class="form-group">
-        <label>Upload Receipt *</label>
-        <input type="file" id="receipt-file" accept="image/*" capture="environment" required>
-        <img id="receipt-preview" class="hidden" alt="Receipt preview">
+        <div class="form-group">
+          <label>Upload Receipt (bank / transfer methods only)</label>
+          <input type="file" id="receipt-file" accept="image/*" capture="environment">
+          <img id="receipt-preview" class="hidden" alt="Receipt preview">
+        </div>
+        <button type="submit" class="btn btn-primary btn-block">Submit receipt for approval</button>
       </div>
-      <button type="submit" class="btn btn-primary btn-block">Submit Payment</button>
     </form>
   </main>
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/modempay.js"></script>
   <script src="js/payments.js"></script>
 </body>
 </html>
-
-
-

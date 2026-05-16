@@ -54,13 +54,14 @@
       <h2 class="text-sm mb-3" style="color:var(--primary)">Payment</h2>
       <p class="payment-amount" data-price-group style="font-size:1.75rem;margin-bottom:1rem">D362.50</p>
       <div id="payment-methods" class="payment-methods"></div>
-      <div class="form-group">
-        <label>Upload payment receipt *</label>
-        <input type="file" id="receipt-file" accept="image/*" capture="environment" required>
-        <img id="receipt-preview" class="hidden receipt-thumb mt-2" alt="Receipt preview">
+      <div id="manual-receipt-block">
+        <div class="form-group">
+          <label>Upload payment receipt (bank / transfer only)</label>
+          <input type="file" id="receipt-file" accept="image/*" capture="environment">
+          <img id="receipt-preview" class="hidden receipt-thumb mt-2" alt="Receipt preview">
+        </div>
+        <button type="submit" id="submit-btn" class="btn btn-primary btn-block btn-lg">Register &amp; submit receipt</button>
       </div>
-
-      <button type="submit" id="submit-btn" class="btn btn-primary btn-block btn-lg">Register &amp; Submit for Approval</button>
       <p id="form-status" class="text-sm text-center mt-2 opacity-70"></p>
     </form>
   </main>
@@ -68,12 +69,13 @@
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/modempay.js"></script>
   <script src="js/payments.js"></script>
   <script>
     if (!localStorage.getItem('buxinev_country')) location.href = 'index.html';
     document.getElementById('country-display').value = BuxinEV.getCountry().name;
     BuxinEV.updatePriceElements();
-    Payments.renderPaymentMethods(document.getElementById('payment-methods'));
+    void Payments.renderPaymentMethods(document.getElementById('payment-methods'), 'group');
 
     let receiptFile = null;
     document.getElementById('receipt-file').addEventListener('change', (e) => {
@@ -96,8 +98,7 @@
       const method = document.querySelector('input[name=payment_method]:checked')?.value;
       const receipt = receiptFile || document.getElementById('receipt-file').files?.[0];
 
-      if (!method) { BuxinEV.showToast('Select a payment method', 'error'); return; }
-      if (!receipt?.size) { BuxinEV.showToast('Upload your payment receipt', 'error'); return; }
+      if (!method) { BuxinEV.showToast('Select a payment method or use Wave / AfriMoney', 'error'); return; }
 
       submitting = true;
       btn.disabled = true;
@@ -120,6 +121,19 @@
             learning_goals: fd.get('learning_goals'),
             profile_picture_base64,
           });
+        }
+        if (BuxinModemPay.isInstantMethod(method)) {
+          await Payments.handleInstantPay('group', method);
+          BuxinEV.showToast('Payment successful! Welcome to Buxin Academy.', 'success');
+          window.location.replace('dashboard.html');
+          return;
+        }
+        if (!receipt?.size) {
+          BuxinEV.showToast('Upload your payment receipt', 'error');
+          submitting = false;
+          btn.disabled = false;
+          status.textContent = '';
+          return;
         }
         const payResult = await Payments.submitWithReceipt('group', method, receipt);
         if (payResult?.upload_warning) {
