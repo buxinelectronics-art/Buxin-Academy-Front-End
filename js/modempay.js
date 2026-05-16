@@ -72,7 +72,13 @@ const BuxinModemPay = {
       ? 'Buxin Academy — Individual Class'
       : 'Buxin Academy — Group Class';
 
+    if (session.payment_link && typeof window.ModemPayCheckout !== 'function') {
+      window.location.href = session.payment_link;
+      return { redirect: true };
+    }
+
     return new Promise((resolve, reject) => {
+      let finished = false;
       const modal = window.ModemPayCheckout({
         amount: session.amount,
         currency: session.currency || 'GMD',
@@ -89,24 +95,33 @@ const BuxinModemPay = {
           class_type: classType,
         },
         callback: async (transaction) => {
+          if (finished) return;
           try {
+            const txId = transaction?.id
+              || transaction?.transaction_id
+              || transaction?.transaction_reference;
+            if (!txId) {
+              throw { error: 'Payment completed but no transaction id returned. Contact support.' };
+            }
             const result = await BuxinEV.api('/api/payments/modempay/verify', {
               method: 'POST',
               body: JSON.stringify({
-                transaction_id: transaction.id,
+                transaction_id: String(txId),
                 payment_id: session.payment_id,
               }),
             });
+            finished = true;
             Auth.saveSession(localStorage.getItem('buxinev_token'), result.user);
             modal?.close?.();
             resolve(result);
           } catch (err) {
+            finished = true;
             modal?.close?.();
             reject(err);
           }
         },
         onClose: (cancelled) => {
-          if (cancelled) {
+          if (!finished && cancelled) {
             reject({ error: 'Payment cancelled', cancelled: true });
           }
         },

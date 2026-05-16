@@ -6,7 +6,7 @@ const BuxinEV = {
 
   COUNTRIES: {
     GM: { name: 'The Gambia', flag: '🇬🇲', currency: 'GMD', symbol: 'D', rate: 72.5,
-      payment_methods: ['Wave', 'Bank Transfer', 'Western Union', 'MoneyGram', 'Ria'] },
+      payment_methods: ['Wave', 'AfriMoney', 'Bank Transfer', 'Western Union', 'MoneyGram', 'Ria'] },
     NG: { name: 'Nigeria', flag: '🇳🇬', currency: 'NGN', symbol: '₦', rate: 1500,
       payment_methods: ['Bank Transfer', 'Opay', 'PalmPay', 'Kuda', 'Visa', 'Mastercard'] },
     SN: { name: 'Senegal', flag: '🇸🇳', currency: 'XOF', symbol: 'CFA', rate: 600,

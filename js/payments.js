@@ -59,7 +59,7 @@ const Payments = {
     return BuxinEV.api('/api/payments/my');
   },
 
-  async renderPaymentMethods(container, classType) {
+  async renderPaymentMethods(container, classType, options = {}) {
     if (!container) return;
     await BuxinModemPay.loadConfig();
 
@@ -97,12 +97,24 @@ const Payments = {
     if (receiptBlock) receiptBlock.classList.toggle('hidden', manual.length === 0);
 
     container.querySelectorAll('.instant-pay-btn').forEach((btn) => {
-      btn.addEventListener('click', () => this.handleInstantPay(classType, btn.dataset.method, btn));
+      btn.addEventListener('click', async () => {
+        try {
+          if (options.beforeAuth) await options.beforeAuth();
+          await this.handleInstantPay(classType, btn.dataset.method, btn);
+        } catch (err) {
+          if (!err.cancelled) {
+            BuxinEV.showToast(err.error || err.message || 'Payment failed', 'error');
+          }
+        }
+      });
     });
   },
 
   async handleInstantPay(classType, method, btn) {
     if (this._submitting) return;
+    if (!localStorage.getItem('buxinev_token')) {
+      throw { error: 'Please log in or complete registration first.' };
+    }
     this._submitting = true;
     if (btn) btn.disabled = true;
     BuxinEV.showToast(`Opening Modem Pay (${method})…`, 'info');
@@ -113,7 +125,9 @@ const Payments = {
       window.location.replace('dashboard.html');
     } catch (err) {
       if (!err.cancelled) {
-        BuxinEV.showToast(err.error || 'Payment failed', 'error');
+        const msg = err.error || err.message || 'Payment failed';
+        BuxinEV.showToast(msg, 'error');
+        throw err;
       }
     } finally {
       this._submitting = false;

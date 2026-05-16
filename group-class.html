@@ -75,7 +75,32 @@
     if (!localStorage.getItem('buxinev_country')) location.href = 'index.html';
     document.getElementById('country-display').value = BuxinEV.getCountry().name;
     BuxinEV.updatePriceElements();
-    void Payments.renderPaymentMethods(document.getElementById('payment-methods'), 'group');
+    async function ensureRegisteredForPay() {
+      const form = document.getElementById('group-register-form');
+      const fd = new FormData(form);
+      const email = String(fd.get('email') || '').toLowerCase().trim();
+      if (!fd.get('full_name') || !email || !fd.get('password') || !fd.get('phone') || !fd.get('city')) {
+        throw { error: 'Fill in all required fields above before paying.' };
+      }
+      const sessionUser = Auth.getUser();
+      if (Auth.isLoggedIn() && sessionUser?.email?.toLowerCase() !== email) Auth.clearSession();
+      if (!Auth.isLoggedIn()) {
+        const pf = document.getElementById('profile-file').files[0];
+        const profile_picture_base64 = pf ? await BuxinEV.compressImageFile(pf) : null;
+        await Auth.register({
+          full_name: fd.get('full_name'), email, phone: fd.get('phone'),
+          city: fd.get('city'), password: fd.get('password'),
+          country_code: BuxinEV.getCountryCode(), class_type: 'group',
+          experience_level: fd.get('experience_level'),
+          learning_goals: fd.get('learning_goals'),
+          profile_picture_base64,
+        });
+      }
+    }
+
+    void Payments.renderPaymentMethods(document.getElementById('payment-methods'), 'group', {
+      beforeAuth: ensureRegisteredForPay,
+    });
 
     let receiptFile = null;
     document.getElementById('receipt-file').addEventListener('change', (e) => {
