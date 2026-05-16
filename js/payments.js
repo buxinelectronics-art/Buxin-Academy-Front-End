@@ -615,7 +615,7 @@ const Payments = {
     const intro = document.getElementById('payment-intro');
     if (intro) {
       if (isRenewal) {
-        intro.textContent = 'Your paid month has ended. Choose a payment method below. After admin approves your receipt, classes and community unlock again for one month.';
+        intro.textContent = 'Your 30-day subscription has ended. Choose a payment method below. After admin approves your receipt, you get Day 1 of 30 again — classes and community unlock.';
       } else if (BuxinEV.getCountryCode() === 'GM') {
         intro.textContent = 'Pick one option below — wallet is instant; bank and transfer need a receipt.';
       }

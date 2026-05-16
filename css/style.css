@@ -579,6 +579,52 @@ button.payment-method-card.instant-pay-btn:hover {
 .post-video-preview { margin-top: 0.75rem; }
 .post-content a { color: var(--accent); word-break: break-all; }
 .subscription-warning { color: #f59e0b; }
+.subscription-card {
+  margin-top: 1rem;
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(0, 0, 0, 0.15);
+}
+.subscription-card--warning {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.08);
+}
+.subscription-card__title {
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  opacity: 0.75;
+  margin-bottom: 0.35rem;
+}
+.subscription-card__day {
+  font-size: 1.35rem;
+  font-weight: 700;
+  margin: 0 0 0.65rem;
+}
+.subscription-progress {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border);
+  overflow: hidden;
+  margin-bottom: 0.65rem;
+}
+.subscription-progress__fill {
+  height: 100%;
+  width: 0;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--accent), #22d3ee);
+  transition: width 0.35s ease;
+}
+.subscription-card--warning .subscription-progress__fill {
+  background: linear-gradient(90deg, #f59e0b, #ef4444);
+}
+.subscription-card__warning {
+  color: #fbbf24;
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  line-height: 1.45;
+}
 .post-footer { display: flex; gap: 1rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
 .like-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 0.95rem; }
 .like-btn.liked { color: #ef4444; }

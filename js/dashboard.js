@@ -161,21 +161,63 @@ const Dashboard = {
 
     set('user-country', country ? `${country.flag} ${country.name}` : user.country_code);
 
-    const subEl = document.getElementById('subscription-status');
-    if (subEl && user.subscription_expires_at) {
-      const exp = new Date(user.subscription_expires_at);
-      const daysLeft = Math.ceil((exp - Date.now()) / 86400000);
-      if (daysLeft > 0) {
-        subEl.textContent = `Monthly access until ${exp.toLocaleDateString()} (${daysLeft} day${daysLeft === 1 ? '' : 's'} left)`;
-        subEl.classList.remove('hidden', 'subscription-warning');
-        if (daysLeft <= 7) subEl.classList.add('subscription-warning');
+    this.renderSubscription(user);
+
+  },
+
+  renderSubscription(user) {
+    const card = document.getElementById('subscription-card');
+    if (!card || !Auth.isSubscriptionActive(user)) {
+      card?.classList.add('hidden');
+      return;
+    }
+
+    const total = user.subscription_days_total || 30;
+    const day = user.subscription_day || 1;
+    const daysLeft = user.subscription_days_left ?? 0;
+    const exp = user.subscription_expires_at ? new Date(user.subscription_expires_at) : null;
+    const expiringSoon = user.subscription_expiring_soon || daysLeft <= 7;
+
+    card.classList.remove('hidden');
+    card.classList.toggle('subscription-card--warning', expiringSoon);
+
+    const dayLabel = document.getElementById('subscription-day-label');
+    if (dayLabel) dayLabel.textContent = `Day ${day} of ${total}`;
+
+    const fill = document.getElementById('subscription-progress-fill');
+    const bar = card.querySelector('.subscription-progress');
+    const pct = Math.min(100, Math.max(0, (day / total) * 100));
+    if (fill) fill.style.width = `${pct}%`;
+    if (bar) {
+      bar.setAttribute('aria-valuenow', String(day));
+      bar.setAttribute('aria-valuetext', `Day ${day} of ${total}`);
+    }
+
+    const detail = document.getElementById('subscription-status');
+    if (detail) {
+      const expText = exp ? exp.toLocaleDateString(undefined, { dateStyle: 'medium' }) : '';
+      detail.textContent = expText
+        ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} left · access ends ${expText}. Pay again before then to keep classes and community.`
+        : 'Your 30-day access is active.';
+    }
+
+    const warn = document.getElementById('subscription-expiry-warning');
+    if (warn) {
+      if (expiringSoon && daysLeft > 0) {
+        warn.textContent = `Your monthly subscription is coming to expire in ${daysLeft} day${daysLeft === 1 ? '' : 's'}. Renew on the Payment page so you do not lose access.`;
+        warn.classList.remove('hidden');
       } else {
-        subEl.textContent = 'Subscription ended — renew on the Payment page.';
-        subEl.classList.add('subscription-warning');
-        subEl.classList.remove('hidden');
+        warn.textContent = '';
+        warn.classList.add('hidden');
       }
     }
 
+    const renew = document.getElementById('subscription-renew-link');
+    if (renew) {
+      const t = user.class_type === 'individual' ? 'individual' : 'group';
+      renew.href = `payment.html?type=${t}&renew=1`;
+      renew.classList.toggle('hidden', !expiringSoon);
+    }
   },
 
 
