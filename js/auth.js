@@ -161,12 +161,18 @@ const Auth = {
 
   async resolvePendingRedirect(user) {
     if (user.status === 'rejected') return 'waiting-approval.html';
+    const cachedPay = BuxinEV.cacheGet('payments');
+    const latestCached = cachedPay?.[0];
+    if (latestCached?.status === 'pending' && latestCached?.receipt_url) {
+      return 'waiting-approval.html';
+    }
     try {
       const { payments } = await BuxinEV.api('/api/payments/my');
+      BuxinEV.cacheSet('payments', payments);
       const latest = payments?.[0];
       if (latest?.status === 'pending' && latest?.receipt_url) return 'waiting-approval.html';
     } catch {
-      /* fall through */
+      /* use cache / payment page */
     }
     const t = user.class_type === 'individual' ? 'individual' : 'group';
     const renew = user.status === 'expired' ? '&renew=1' : '';

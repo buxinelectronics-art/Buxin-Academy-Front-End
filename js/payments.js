@@ -540,7 +540,6 @@ const Payments = {
     const cached = Auth.getUser();
     if (cached) await Auth.updateNavLinks(cached);
     BuxinEV.initStudentNav('payment');
-    BuxinEV._startWakeInBackground();
 
     if (!Auth.isLoggedIn()) {
 
@@ -556,8 +555,12 @@ const Payments = {
 
 
 
-    const user = await Auth.refreshUserFresh() || cached;
+    if (cached && Auth.isSubscriptionActive(cached)) {
+      void Auth.refreshUserInBackground();
+      return this.initPaymentHistory(cached);
+    }
 
+    const user = cached || await Auth.refreshUserFresh();
     if (!user) return;
 
     if (Auth.isSubscriptionActive(user)) {
@@ -753,19 +756,21 @@ const Payments = {
       list.innerHTML = this.renderHistoryList(cached);
     }
 
-    try {
-      const { payments } = await this.getMyPayments();
-      BuxinEV.cacheSet('payments', payments);
-      if (list) {
-        list.innerHTML = payments.length
-          ? this.renderHistoryList(payments)
-          : '<p class="opacity-70">No payments yet.</p>';
+    void (async () => {
+      try {
+        const { payments } = await this.getMyPayments();
+        BuxinEV.cacheSet('payments', payments);
+        if (list) {
+          list.innerHTML = payments.length
+            ? this.renderHistoryList(payments)
+            : '<p class="opacity-70">No payments yet.</p>';
+        }
+      } catch {
+        if (list && !list.querySelector('.payment-history-item')) {
+          list.innerHTML = '<p class="opacity-70">Could not refresh — showing saved data if any.</p>';
+        }
       }
-    } catch {
-      if (list && !list.innerHTML.trim()) {
-        list.innerHTML = '<p class="opacity-70">Could not load payments. Try again.</p>';
-      }
-    }
+    })();
   },
 
   renderHistoryList(payments) {

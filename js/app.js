@@ -288,13 +288,28 @@ const BuxinEV = {
     });
   },
 
-  /** First attempt is immediate; retries only after failure (no wait before attempt 1). */
-  async fetchWithRetry(url, options = {}, { maxAttempts = 3, timeoutMs = 25000 } = {}) {
-    const backoffMs = [300, 600, 1000];
+  WARM_CONNECTION_MS: 5 * 60 * 1000,
+
+  _recentlyConnected() {
+    const last = parseInt(sessionStorage.getItem('buxinev_last_wake') || '0', 10) || 0;
+    return last > 0 && Date.now() - last < this.WARM_CONNECTION_MS;
+  },
+
+  /** Warm = server answered recently (e.g. you were just on Community). Cold = allow up to 90s once for Render boot. */
+  _fetchPolicy(isWrite = false) {
+    if (this._recentlyConnected()) {
+      return { maxAttempts: isWrite ? 2 : 1, timeoutMs: isWrite ? 20000 : 15000 };
+    }
+    return { maxAttempts: 1, timeoutMs: 90000 };
+  },
+
+  async fetchWithRetry(url, options = {}, policy = {}) {
+    const { maxAttempts = 1, timeoutMs = 90000 } = policy;
+    const backoffMs = [400, 800];
     let lastNetworkError = null;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       if (attempt > 0) {
-        await new Promise((r) => setTimeout(r, backoffMs[attempt - 1] || 3000));
+        await new Promise((r) => setTimeout(r, backoffMs[attempt - 1] || 800));
       }
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -331,12 +346,13 @@ const BuxinEV = {
     const method = (options.method || 'GET').toUpperCase();
     const read = !['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
 
+    const isWrite = !read;
     let res;
     try {
       res = await this.fetchWithRetry(`${this.API_URL}${endpoint}`, {
         ...options,
         headers,
-      });
+      }, this._fetchPolicy(isWrite));
     } catch (err) {
       if (err?.name === 'AbortError' || options.signal?.aborted) {
         throw { error: 'Request cancelled.', aborted: true };
@@ -404,7 +420,7 @@ const BuxinEV = {
 
   _keepaliveTimer: null,
   _keepaliveStarted: false,
-  KEEPALIVE_INTERVAL_MS: 4 * 60 * 1000,
+  KEEPALIVE_INTERVAL_MS: 2 * 60 * 1000,
 
   _markWakeSuccess(dbOk) {
     sessionStorage.setItem('buxinev_last_wake', String(Date.now()));
@@ -414,7 +430,9 @@ const BuxinEV = {
   /** Lightweight ping only — used on a timer so we do not spam wake+DB on every API call. */
   _keepAlivePing() {
     const base = this.API_URL.replace(/\/$/, '');
-    fetch(`${base}/api/ping`, { method: 'GET', mode: 'cors', cache: 'no-store' }).catch(() => {});
+    fetch(`${base}/api/ping`, { method: 'GET', mode: 'cors', cache: 'no-store' })
+      .then((r) => { if (r.ok) this._markWakeSuccess(false); })
+      .catch(() => {});
   },
 
   /** Full wake once (page load). Data requests themselves also hit the server — no duplicate wake per api(). */
