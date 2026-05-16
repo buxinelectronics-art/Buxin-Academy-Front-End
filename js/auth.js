@@ -14,10 +14,22 @@ const Auth = {
     localStorage.setItem('buxinev_user', JSON.stringify(user));
   },
 
-  logout() {
+  clearSession() {
     localStorage.removeItem('buxinev_token');
     localStorage.removeItem('buxinev_user');
+    sessionStorage.removeItem('buxinev_wake_ok');
+  },
+
+  logout() {
+    this.clearSession();
     window.location.href = 'login.html';
+  },
+
+  isAuthError(err) {
+    return err?.status === 401
+      || err?.error === 'User not found'
+      || err?.error === 'Token expired'
+      || err?.error === 'Invalid token';
   },
 
   requireAuth(redirect = 'login.html') {
@@ -60,7 +72,12 @@ const Auth = {
       const data = await BuxinEV.api('/api/auth/me');
       localStorage.setItem('buxinev_user', JSON.stringify(data.user));
       return data.user;
-    } catch {
+    } catch (err) {
+      if (this.isAuthError(err)) {
+        this.clearSession();
+        window.location.href = 'login.html?msg=session';
+        return null;
+      }
       return this.getUser();
     }
   },
@@ -100,6 +117,9 @@ document.addEventListener('DOMContentLoaded', () => {
   if (emailEl && params.get('email')) emailEl.value = params.get('email');
   if (params.get('msg') === 'exists') {
     BuxinEV.showToast('Account exists — log in to complete payment.', 'info');
+  }
+  if (params.get('msg') === 'session') {
+    BuxinEV.showToast('Your session expired — log in again.', 'info');
   }
 });
 

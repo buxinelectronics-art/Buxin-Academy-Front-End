@@ -5,6 +5,7 @@ const Dashboard = {
     if (!Auth.requireAuth()) return;
     BuxinEV.requireCountry();
     const user = await Auth.refreshUser();
+    if (!user) return;
     if (user.role === 'admin') {
       window.location.href = 'admin-dashboard.html';
       return;
@@ -30,7 +31,11 @@ const Dashboard = {
   renderProfile(user) {
     document.getElementById('user-name') && (document.getElementById('user-name').textContent = user.full_name);
     document.getElementById('user-email') && (document.getElementById('user-email').textContent = user.email);
-    document.getElementById('user-status') && (document.getElementById('user-status').textContent = user.status);
+    const statusEl = document.getElementById('user-status');
+    if (statusEl) {
+      statusEl.textContent = user.status;
+      statusEl.className = `status-badge status-${user.status}`;
+    }
     document.getElementById('user-class') && (document.getElementById('user-class').textContent =
       user.class_type === 'individual' ? 'Individual Mentorship' : 'Group Class (Sundays)');
     const avatar = document.getElementById('user-avatar');
@@ -156,6 +161,7 @@ const WaitingPage = {
   async init() {
     if (!Auth.requireAuth()) return;
     const user = await Auth.refreshUser();
+    if (!user) return;
     if (user.status === 'active') {
       window.location.href = 'dashboard.html';
       return;

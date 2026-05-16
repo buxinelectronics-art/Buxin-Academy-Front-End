@@ -23,7 +23,14 @@ const Payments = {
       };
     }
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw data;
+    if (!res.ok) {
+      const err = { status: res.status, ...data };
+      if (Auth.isAuthError(err)) {
+        Auth.clearSession();
+        err.error = 'Session expired — please log in and submit your receipt again.';
+      }
+      throw err;
+    }
     return data;
   },
 
@@ -73,7 +80,7 @@ const Payments = {
     `).join('');
   },
 
-  initPaymentPage() {
+  async initPaymentPage() {
     if (!Auth.isLoggedIn()) {
       const type = new URLSearchParams(location.search).get('type') || 'group';
       window.location.href = `login.html?next=${encodeURIComponent(`payment.html?type=${type}`)}&msg=exists`;
@@ -81,7 +88,8 @@ const Payments = {
     }
     BuxinEV.requireCountry();
 
-    const user = Auth.getUser();
+    const user = await Auth.refreshUser();
+    if (!user) return;
     const classType = new URLSearchParams(location.search).get('type')
       || user?.class_type || 'group';
     const price = classType === 'individual'
@@ -130,7 +138,12 @@ const Payments = {
         btn.disabled = false;
         let msg = err.error || 'Payment failed';
         if (err.network) msg = err.error;
-        if (err.status === 401) msg = 'Session expired — log in again.';
+        if (Auth.isAuthError(err)) {
+          msg = err.error || 'Session expired — log in and try again.';
+          setTimeout(() => {
+            window.location.href = `login.html?next=${encodeURIComponent(location.pathname + location.search)}`;
+          }, 1500);
+        }
         BuxinEV.showToast(msg, 'error');
       }
     });

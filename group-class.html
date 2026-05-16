@@ -81,7 +81,7 @@
       e.preventDefault();
       if (submitting) return;
       const fd = new FormData(e.target);
-      const email = fd.get('email');
+      const email = String(fd.get('email') || '').toLowerCase().trim();
       const btn = document.getElementById('submit-btn');
       const status = document.getElementById('form-status');
       const method = document.querySelector('input[name=payment_method]:checked')?.value;
@@ -98,6 +98,10 @@
       const profile_picture_base64 = file ? await BuxinEV.compressImageFile(file) : null;
 
       try {
+        const sessionUser = Auth.getUser();
+        if (Auth.isLoggedIn() && sessionUser?.email?.toLowerCase() !== email) {
+          Auth.clearSession();
+        }
         if (!Auth.isLoggedIn()) {
           await Auth.register({
             full_name: fd.get('full_name'), email, phone: fd.get('phone'),
@@ -116,7 +120,10 @@
         submitting = false;
         btn.disabled = false;
         status.textContent = '';
-        if (!Auth.handleRegisterError(err, email, 'group')) {
+        if (Auth.isAuthError(err)) {
+          Auth.clearSession();
+          BuxinEV.showToast('Session expired — submit the form again.', 'error');
+        } else if (!Auth.handleRegisterError(err, email, 'group')) {
           BuxinEV.showToast(err.error || 'Submission failed', 'error');
         }
       }
