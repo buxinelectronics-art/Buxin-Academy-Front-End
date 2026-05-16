@@ -75,11 +75,12 @@
     BuxinEV.updatePriceElements();
     Payments.renderPaymentMethods(document.getElementById('payment-methods'));
 
+    let receiptFile = null;
     document.getElementById('receipt-file').addEventListener('change', (e) => {
-      const file = e.target.files[0];
+      receiptFile = e.target.files?.[0] || null;
       const preview = document.getElementById('receipt-preview');
-      if (file && preview) {
-        preview.src = URL.createObjectURL(file);
+      if (receiptFile && preview) {
+        preview.src = URL.createObjectURL(receiptFile);
         preview.classList.remove('hidden');
       }
     });
@@ -93,10 +94,10 @@
       const btn = document.getElementById('submit-btn');
       const status = document.getElementById('form-status');
       const method = document.querySelector('input[name=payment_method]:checked')?.value;
-      const receipt = document.getElementById('receipt-file').files[0];
+      const receipt = receiptFile || document.getElementById('receipt-file').files?.[0];
 
       if (!method) { BuxinEV.showToast('Select a payment method', 'error'); return; }
-      if (!receipt) { BuxinEV.showToast('Upload your payment receipt', 'error'); return; }
+      if (!receipt?.size) { BuxinEV.showToast('Upload your payment receipt', 'error'); return; }
 
       submitting = true;
       btn.disabled = true;

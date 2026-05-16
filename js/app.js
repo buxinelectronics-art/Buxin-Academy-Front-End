@@ -89,36 +89,69 @@ const BuxinEV = {
     return next;
   },
 
-  /** Compress receipt images for upload (always JPEG, max 1200px). */
+  isImageFile(file) {
+    if (!file) return false;
+    if (file.type && file.type.startsWith('image/')) return true;
+    return /\.(png|jpe?g|webp|gif|bmp|heic)$/i.test(file.name || '');
+  },
+
+  readFileAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject({ error: 'Could not read receipt file.' });
+      r.readAsDataURL(file);
+    });
+  },
+
+  /** Compress receipt images for upload (JPEG, max 1200px); FileReader fallback if canvas fails. */
   async compressReceiptFile(file) {
     if (!file) return null;
-    if (!file.type.startsWith('image/')) {
+    if (!this.isImageFile(file)) {
       throw { error: 'Receipt must be an image (JPG or PNG).' };
     }
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxW = 1200;
-        let w = img.width;
-        let h = img.height;
-        if (w > maxW) {
-          h = (h * maxW) / w;
-          w = maxW;
-        }
-        canvas.width = w;
-        canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL('image/jpeg', 0.82));
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        reject({ error: 'Could not read receipt image. Try another file.' });
-      };
-      img.src = url;
-    });
+    try {
+      const dataUrl = await new Promise((resolve, reject) => {
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const maxW = 1200;
+          let w = img.width;
+          let h = img.height;
+          if (!w || !h) {
+            URL.revokeObjectURL(url);
+            reject(new Error('invalid dimensions'));
+            return;
+          }
+          if (w > maxW) {
+            h = (h * maxW) / w;
+            w = maxW;
+          }
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(url);
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error('image load failed'));
+        };
+        img.src = url;
+      });
+      if (dataUrl && dataUrl.length > 80) return dataUrl;
+    } catch {
+      /* fallback below */
+    }
+    const raw = await this.readFileAsDataUrl(file);
+    if (raw && String(raw).length > 80) return raw;
+    throw { error: 'Could not read receipt image. Try JPG or PNG.' };
+  },
+
+  async dataUrlToBlob(dataUrl) {
+    const res = await fetch(dataUrl);
+    return res.blob();
   },
 
   async compressImageFile(file) {

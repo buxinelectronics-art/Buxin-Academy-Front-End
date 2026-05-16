@@ -2,13 +2,30 @@ const Payments = {
   _submitting: false,
 
   async submitWithReceipt(classType, method, file) {
-    if (!localStorage.getItem('buxinev_token')) {
-      throw { error: 'Please log in first.' };
+    if (!file?.size) {
+      throw { error: 'Choose a receipt image before submitting.' };
     }
+    const token = localStorage.getItem('buxinev_token');
+    if (!token) throw { error: 'Please log in first.' };
+
     const receipt_base64 = await BuxinEV.compressReceiptFile(file);
-    if (!receipt_base64) {
-      throw { error: 'Could not read receipt image. Use JPG or PNG under 5MB.' };
-    }
+    const url = `${BuxinEV.API_URL}/api/payments/submit`;
+    const authHeaders = { Authorization: `Bearer ${token}` };
+
+    const parseResponse = async (res) => {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = { status: res.status, ...data };
+        if (Auth.isAuthError(err)) {
+          Auth.clearSession();
+          err.error = 'Session expired — log in and submit your receipt again.';
+        }
+        throw err;
+      }
+      return data;
+    };
+
+    // 1) JSON + base64 (works with API retries)
     try {
       return await BuxinEV.api('/api/payments/submit', {
         method: 'POST',
@@ -19,18 +36,24 @@ const Payments = {
         }),
       });
     } catch (err) {
-      if (Auth.isAuthError(err)) {
-        Auth.clearSession();
-        throw {
-          ...err,
-          error: 'Session expired — log in and submit your receipt again.',
-        };
+      const msg = (err.error || '').toLowerCase();
+      const retryMultipart = err.status === 400 && msg.includes('receipt');
+      if (!retryMultipart) {
+        if (err.status === 413) {
+          throw { error: 'Receipt file is too large. Try a smaller screenshot.' };
+        }
+        throw err;
       }
-      if (err.status === 413) {
-        throw { error: 'Receipt file is too large. Try a smaller screenshot.' };
-      }
-      throw err;
     }
+
+    // 2) Multipart fallback (fresh FormData each time)
+    const blob = await BuxinEV.dataUrlToBlob(receipt_base64);
+    const form = new FormData();
+    form.append('class_type', classType);
+    form.append('payment_method', method);
+    form.append('receipt', blob, 'receipt.jpg');
+    const res = await fetch(url, { method: 'POST', headers: authHeaders, body: form });
+    return parseResponse(res);
   },
 
   async createPayment(classType, method) {
@@ -109,8 +132,10 @@ const Payments = {
     if (methodsContainer) this.renderPaymentMethods(methodsContainer);
 
     const preview = document.getElementById('receipt-preview');
-    document.getElementById('receipt-file')?.addEventListener('change', (e) => {
-      const file = e.target.files[0];
+    const receiptInput = document.getElementById('receipt-file');
+    receiptInput?.addEventListener('change', (e) => {
+      const file = e.target.files?.[0];
+      this._receiptFile = file || null;
       if (file && preview) {
         preview.src = URL.createObjectURL(file);
         preview.classList.remove('hidden');
@@ -122,9 +147,9 @@ const Payments = {
       if (this._submitting) return;
       const btn = e.target.querySelector('[type=submit]');
       const method = document.querySelector('input[name=payment_method]:checked')?.value;
-      const file = document.getElementById('receipt-file')?.files[0];
+      const file = this._receiptFile || document.getElementById('receipt-file')?.files?.[0];
       if (!method) { BuxinEV.showToast('Select a payment method', 'error'); return; }
-      if (!file) { BuxinEV.showToast('Upload receipt', 'error'); return; }
+      if (!file?.size) { BuxinEV.showToast('Upload receipt', 'error'); return; }
 
       this._submitting = true;
       btn.disabled = true;
