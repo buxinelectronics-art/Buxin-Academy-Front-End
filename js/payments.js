@@ -112,6 +112,15 @@ const Payments = {
 
     const user = await Auth.refreshUser();
     if (!user) return;
+    if (user.status === 'active') {
+      window.location.replace('dashboard.html');
+      return;
+    }
+    const pendingDest = await Auth.resolvePendingRedirect(user);
+    if (pendingDest === 'waiting-approval.html') {
+      window.location.replace('waiting-approval.html');
+      return;
+    }
     const classType = new URLSearchParams(location.search).get('type')
       || user?.class_type || 'group';
     const price = classType === 'individual'

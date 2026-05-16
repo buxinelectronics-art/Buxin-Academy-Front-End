@@ -21,14 +21,18 @@
       <img id="waiting-receipt" class="hidden receipt-thumb" alt="Your receipt" style="max-width:100%">
     </div>
 
-    <p class="opacity-70 text-sm">You'll receive a notification once approved. Check back soon!</p>
-    <a href="dashboard.html" class="btn btn-secondary mt-3">View Dashboard</a>
+    <p class="opacity-70 text-sm">You'll receive a notification once approved. Until then, only this page is available.</p>
+    <p class="text-sm mt-3 opacity-70">Your dashboard, classes, and community unlock after approval.</p>
+    <button type="button" id="waiting-logout" class="btn btn-secondary mt-3">Log out</button>
   </main>
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/payments.js"></script>
   <script src="js/dashboard.js"></script>
+  <script>
+    document.getElementById('waiting-logout')?.addEventListener('click', () => Auth.logout());
+  </script>
 </body>
 </html>
 

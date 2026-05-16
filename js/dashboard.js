@@ -11,7 +11,7 @@ const Dashboard = {
       return;
     }
     if (user.status !== 'active') {
-      window.location.href = 'waiting-approval.html';
+      window.location.replace(await Auth.resolvePendingRedirect(user));
       return;
     }
     this.renderProfile(user);

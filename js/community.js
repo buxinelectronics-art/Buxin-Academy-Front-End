@@ -5,7 +5,7 @@ const Community = {
     if (!Auth.requireAuth()) return;
     const user = await Auth.refreshUser();
     if (user.status !== 'active') {
-      window.location.href = 'waiting-approval.html';
+      window.location.replace(await Auth.resolvePendingRedirect(user));
       return;
     }
     await this.loadPosts();

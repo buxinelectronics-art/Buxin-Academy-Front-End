@@ -8,6 +8,12 @@ const Auth = {
     'individual-class.html',
   ],
 
+  /** Pages allowed while payment is pending review */
+  PENDING_ALLOWED_PAGES: ['waiting-approval.html', 'payment.html', 'login.html'],
+
+  /** Dashboard, community, etc. — only after admin approves payment */
+  ACTIVE_ONLY_PAGES: ['dashboard.html', 'community.html'],
+
   currentPage() {
     const path = window.location.pathname.split('/').pop();
     return path || 'index.html';
@@ -57,7 +63,7 @@ const Auth = {
   requireAdmin() {
     const user = this.getUser();
     if (!user || user.role !== 'admin') {
-      window.location.href = 'dashboard.html';
+      window.location.href = 'login.html';
       return false;
     }
     return true;
@@ -96,19 +102,31 @@ const Auth = {
     }
   },
 
-  async studentDestination(user) {
-    if (user.role === 'admin') return 'admin-dashboard.html';
-    if (user.status === 'active') return 'dashboard.html';
+  async resolvePendingRedirect(user) {
     if (user.status === 'rejected') return 'waiting-approval.html';
     try {
       const { payments } = await BuxinEV.api('/api/payments/my');
       const latest = payments?.[0];
       if (latest?.receipt_url) return 'waiting-approval.html';
     } catch {
-      /* use payment page fallback */
+      /* fall through */
     }
     const t = user.class_type === 'individual' ? 'individual' : 'group';
     return `payment.html?type=${t}`;
+  },
+
+  async studentDestination(user) {
+    if (user.role === 'admin') return 'admin-dashboard.html';
+    if (user.status === 'active') return 'dashboard.html';
+    return this.resolvePendingRedirect(user);
+  },
+
+  isSafeNextForUser(user, next) {
+    if (!next) return null;
+    if (user.status === 'active') return next;
+    const path = next.split('?')[0];
+    if (path === 'payment.html' || path === 'waiting-approval.html') return next;
+    return null;
   },
 
   async goToStudentHome(user, nextOverride) {
@@ -116,20 +134,69 @@ const Auth = {
       window.location.href = 'admin-dashboard.html';
       return;
     }
-    if (nextOverride) {
-      window.location.href = nextOverride;
-      return;
-    }
     if (user.status === 'active') {
-      window.location.href = 'dashboard.html';
+      window.location.href = nextOverride || 'dashboard.html';
       return;
     }
-    window.location.href = await this.studentDestination(user);
+    const safeNext = this.isSafeNextForUser(user, nextOverride);
+    if (safeNext) {
+      window.location.href = safeNext;
+      return;
+    }
+    window.location.href = await this.resolvePendingRedirect(user);
   },
 
   redirectByStatus(user) {
     const next = new URLSearchParams(window.location.search).get('next');
-    void this.goToStudentHome(user, next || null);
+    void this.goToStudentHome(user, this.isSafeNextForUser(user, next));
+  },
+
+  /** Pending students may only complete payment or wait; active students use the app. */
+  async canAccessPage(user, page) {
+    if (!user || user.role === 'admin') return true;
+    if (user.status === 'active') {
+      return page !== 'waiting-approval.html';
+    }
+    const dest = await this.resolvePendingRedirect(user);
+    if (page === 'waiting-approval.html') return dest === 'waiting-approval.html';
+    if (page === 'payment.html') return dest.startsWith('payment.html');
+    if (page === 'individual-class.html') {
+      return dest.startsWith('payment.html') && user.class_type === 'individual';
+    }
+    if (page === 'login.html') return true;
+    return false;
+  },
+
+  async enforceStudentAccess() {
+    if (!this.isLoggedIn()) return;
+    const page = this.currentPage();
+    const user = await this.refreshUser();
+    if (!user) return;
+
+    if (user.role === 'admin') {
+      if (this.ACTIVE_ONLY_PAGES.includes(page)) {
+        window.location.href = 'admin-dashboard.html';
+      }
+      return;
+    }
+
+    await this.updateNavLinks(user);
+
+    if (user.status === 'active') {
+      if (page === 'waiting-approval.html') {
+        window.location.href = 'dashboard.html';
+      }
+      return;
+    }
+
+    if (this.ACTIVE_ONLY_PAGES.includes(page) || page === 'dashboard.html') {
+      window.location.href = await this.resolvePendingRedirect(user);
+      return;
+    }
+
+    if (!(await this.canAccessPage(user, page))) {
+      window.location.href = await this.resolvePendingRedirect(user);
+    }
   },
 
   async updateNavLinks(user) {
@@ -153,14 +220,25 @@ const Auth = {
     });
   },
 
-  /** Logged-in students/admins should not stay on marketing/login pages. */
+  /** Logged-in users should not stay on marketing/signup pages (except individual schedule step). */
   async guardPublicEntry() {
     if (!this.isLoggedIn()) return;
     const user = await this.refreshUser();
     if (!user) return;
     await this.updateNavLinks(user);
-    if (this.PUBLIC_PAGES.includes(this.currentPage())) {
+    const page = this.currentPage();
+    if (!this.PUBLIC_PAGES.includes(page)) return;
+
+    if (user.role === 'admin') {
+      window.location.href = 'admin-dashboard.html';
+      return;
+    }
+    if (user.status === 'active') {
       await this.goToStudentHome(user);
+      return;
+    }
+    if (!(await this.canAccessPage(user, page))) {
+      window.location.href = await this.resolvePendingRedirect(user);
     }
   },
 
@@ -187,11 +265,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (params.get('msg') === 'session') {
     BuxinEV.showToast('Your session expired — log in again.', 'info');
   }
-  void Auth.guardPublicEntry().then(() => {
-    if (Auth.isLoggedIn() && !Auth.PUBLIC_PAGES.includes(Auth.currentPage())) {
-      void Auth.updateNavLinks(Auth.getUser());
-    }
-  });
+  void Auth.guardPublicEntry().then(() => Auth.enforceStudentAccess());
 });
 
 document.getElementById('login-form')?.addEventListener('submit', async (e) => {
