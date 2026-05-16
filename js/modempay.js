@@ -90,8 +90,8 @@ const BuxinModemPay = {
         customer_name: user?.full_name,
         customer_phone: user?.phone || '',
         metadata: {
-          payment_id: session.payment_id,
-          user_id: user?.id,
+          payment_id: String(session.payment_id),
+          user_id: String(user?.id || ''),
           class_type: classType,
         },
         callback: async (transaction) => {
@@ -108,6 +108,7 @@ const BuxinModemPay = {
               body: JSON.stringify({
                 transaction_id: String(txId),
                 payment_id: session.payment_id,
+                transaction,
               }),
             });
             finished = true;

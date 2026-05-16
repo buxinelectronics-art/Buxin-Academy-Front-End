@@ -87,14 +87,23 @@
       if (!Auth.isLoggedIn()) {
         const pf = document.getElementById('profile-file').files[0];
         const profile_picture_base64 = pf ? await BuxinEV.compressImageFile(pf) : null;
-        await Auth.register({
+        const payload = {
           full_name: fd.get('full_name'), email, phone: fd.get('phone'),
           city: fd.get('city'), password: fd.get('password'),
           country_code: BuxinEV.getCountryCode(), class_type: 'group',
           experience_level: fd.get('experience_level'),
           learning_goals: fd.get('learning_goals'),
           profile_picture_base64,
-        });
+        };
+        try {
+          await Auth.register(payload);
+        } catch (err) {
+          if (err.status === 409) {
+            await Auth.login(email, fd.get('password'));
+          } else {
+            throw err;
+          }
+        }
       }
     }
 
