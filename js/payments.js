@@ -570,7 +570,7 @@ const Payments = {
     if (!user) return;
 
     if (Auth.isSubscriptionActive(user)) {
-      return this.initPaymentHistory(user);
+      return this.initPaymentHistory();
     }
 
     const pendingDest = await Auth.resolvePendingRedirect(user);
