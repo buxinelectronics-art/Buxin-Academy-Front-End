@@ -235,7 +235,6 @@ const BuxinEV = {
     const token = localStorage.getItem('buxinev_token');
     const headers = {};
     if (token) headers.Authorization = `Bearer ${token}`;
-    void this._keepAliveNudge();
     let res;
     try {
       res = await this.fetchUploadWithRetry(`${this.API_URL}${endpoint}`, {
@@ -289,9 +288,9 @@ const BuxinEV = {
     });
   },
 
-  /** First attempt is immediate; short retries only after failure. */
-  async fetchWithRetry(url, options = {}, { maxAttempts = 5, timeoutMs = 45000 } = {}) {
-    const backoffMs = [400, 800, 1200, 2000];
+  /** First attempt is immediate; retries only after failure (no wait before attempt 1). */
+  async fetchWithRetry(url, options = {}, { maxAttempts = 3, timeoutMs = 25000 } = {}) {
+    const backoffMs = [300, 600, 1000];
     let lastNetworkError = null;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       if (attempt > 0) {
@@ -331,7 +330,6 @@ const BuxinEV = {
 
     const method = (options.method || 'GET').toUpperCase();
     const read = !['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
-    void this._keepAliveNudge();
 
     let res;
     try {
@@ -406,17 +404,23 @@ const BuxinEV = {
 
   _keepaliveTimer: null,
   _keepaliveStarted: false,
-  KEEPALIVE_INTERVAL_MS: 90 * 1000,
+  KEEPALIVE_INTERVAL_MS: 4 * 60 * 1000,
 
   _markWakeSuccess(dbOk) {
     sessionStorage.setItem('buxinev_last_wake', String(Date.now()));
     if (dbOk) sessionStorage.setItem('buxinev_wake_ok', '1');
   },
 
-  /** Fire-and-forget pings — never blocks data; API calls run in parallel. */
-  _keepAliveNudge() {
+  /** Lightweight ping only — used on a timer so we do not spam wake+DB on every API call. */
+  _keepAlivePing() {
     const base = this.API_URL.replace(/\/$/, '');
     fetch(`${base}/api/ping`, { method: 'GET', mode: 'cors', cache: 'no-store' }).catch(() => {});
+  },
+
+  /** Full wake once (page load). Data requests themselves also hit the server — no duplicate wake per api(). */
+  _wakeOnce() {
+    const base = this.API_URL.replace(/\/$/, '');
+    this._keepAlivePing();
     fetch(`${base}/api/wake`, { method: 'GET', mode: 'cors', cache: 'no-store' })
       .then((r) => r.json().catch(() => ({})))
       .then((data) => { if (data?.status) this._markWakeSuccess(data.db === 1); })
@@ -424,24 +428,24 @@ const BuxinEV = {
   },
 
   _startWakeInBackground() {
-    this._keepAliveNudge();
+    this._wakeOnce();
   },
 
   startKeepalive() {
     if (this._keepaliveStarted) return;
     this._keepaliveStarted = true;
-    this._keepAliveNudge();
+    this._wakeOnce();
     this._keepaliveTimer = setInterval(() => {
       if (document.visibilityState === 'hidden') return;
-      this._keepAliveNudge();
+      this._keepAlivePing();
     }, this.KEEPALIVE_INTERVAL_MS);
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') this._keepAliveNudge();
+      if (document.visibilityState === 'visible') this._keepAlivePing();
     });
   },
 
   wakeBackendIfNeeded() {
-    this._keepAliveNudge();
+    this._keepAlivePing();
   },
 
   cacheGet(key) {

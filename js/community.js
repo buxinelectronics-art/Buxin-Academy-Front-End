@@ -60,7 +60,9 @@ const Community = {
     if (!Auth.requireAuth()) return;
 
     const cached = Auth.getUser();
-    if (!this.canUse(cached)) {
+    if (cached && this.canUse(cached)) {
+      void Auth.refreshUserInBackground();
+    } else {
       const user = await Auth.refreshUserFresh() || cached;
       if (!this.canUse(user)) {
         window.location.replace(await Auth.resolvePendingRedirect(user || cached));
@@ -76,7 +78,6 @@ const Community = {
       feed.innerHTML = cachedPosts.map((p) => this.renderPost(p, Auth.getUser())).join('');
     }
 
-    void BuxinEV._startWakeInBackground();
     this.bindEvents();
     this.initSocket();
     void this.loadPosts();
@@ -379,7 +380,7 @@ const Community = {
     const gen = ++this._feedLoadGen;
 
     const hasPosts = feed.querySelector('.post-card');
-    if (!hasPosts) {
+    if (!hasPosts && !BuxinEV.cacheGet('community_posts')?.length) {
       feed.innerHTML = '<p class="loading-pulse opacity-70">Loading…</p>';
     }
 

@@ -109,10 +109,13 @@ const Auth = {
     }
   },
 
-  /** Always fetch fresh status (approval, etc.) — never trust stale cache alone. */
+  /** Fetch fresh user; use cached profile first on pages that call this while UI is loading. */
   async refreshUserFresh() {
-    void BuxinEV._startWakeInBackground();
     return this.refreshUser({ allowStale: false });
+  },
+
+  refreshUserInBackground() {
+    void this.refreshUser({ allowStale: true });
   },
 
   onApproved(user) {
@@ -231,8 +234,17 @@ const Auth = {
     const page = this.currentPage();
     const cached = this.getUser();
     if (cached) await this.updateNavLinks(cached);
-    const user = await this.refreshUserFresh() || cached;
+    const user = cached || await this.refreshUserFresh();
     if (!user) return;
+
+    if (cached && this.ACTIVE_ONLY_PAGES.includes(page)) {
+      void this.refreshUser({ allowStale: true }).then((fresh) => {
+        if (!fresh || this.isSubscriptionActive(fresh)) return;
+        void this.resolvePendingRedirect(fresh).then((dest) => { window.location.href = dest; });
+      });
+    } else {
+      void this.refreshUserInBackground();
+    }
 
     if (user.role === 'admin') {
       if (this.ACTIVE_ONLY_PAGES.includes(page)) {

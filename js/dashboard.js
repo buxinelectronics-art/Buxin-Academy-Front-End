@@ -25,11 +25,9 @@ const Dashboard = {
 
 
 
-    BuxinEV._startWakeInBackground();
+    void Auth.refreshUserInBackground();
 
-
-
-    const user = await Auth.refreshUserFresh() || cached;
+    const user = cached || await Auth.refreshUserFresh();
 
     if (!user) return;
 
