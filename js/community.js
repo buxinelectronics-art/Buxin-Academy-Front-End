@@ -174,7 +174,7 @@ const Community = {
   },
 
   _resetPostingIfStuck() {
-    if (this._posting && Date.now() - this._postingSince > 90000) {
+    if (this._posting && Date.now() - this._postingSince > 12000) {
       this._posting = false;
     }
   },
@@ -182,12 +182,10 @@ const Community = {
   async submitPost(e) {
     e.preventDefault();
     this._resetPostingIfStuck();
-    if (this._posting) {
-      BuxinEV.showToast('Still sending the last post — wait a moment', 'info');
-      return;
-    }
 
     const form = e.currentTarget;
+    const btn = document.getElementById('post-submit-btn') || form.querySelector('[type=submit]');
+    if (btn?.disabled) return;
     const contentEl = document.getElementById('post-content');
     const content = contentEl?.value.trim() || '';
     const file = document.getElementById('post-image')?.files?.[0];
@@ -196,7 +194,6 @@ const Community = {
       return;
     }
 
-    const btn = document.getElementById('post-submit-btn') || form.querySelector('[type=submit]');
     const prevLabel = btn?.textContent || 'Post';
     const pendingId = `pending-${Date.now()}`;
     let localPreviewUrl = null;

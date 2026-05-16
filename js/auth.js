@@ -106,8 +106,7 @@ const Auth = {
 
   /** Always fetch fresh status (approval, etc.) — never trust stale cache alone. */
   async refreshUserFresh() {
-    BuxinEV._startWakeInBackground();
-    await BuxinEV.ensureAwake(1500);
+    void BuxinEV._startWakeInBackground();
     return this.refreshUser({ allowStale: false });
   },
 

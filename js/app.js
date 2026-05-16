@@ -235,8 +235,7 @@ const BuxinEV = {
     const token = localStorage.getItem('buxinev_token');
     const headers = {};
     if (token) headers.Authorization = `Bearer ${token}`;
-    this._startWakeInBackground();
-    await this.ensureAwake(1500);
+    void this._startWakeInBackground();
     let res;
     try {
       res = await this.fetchUploadWithRetry(`${this.API_URL}${endpoint}`, {
@@ -293,9 +292,8 @@ const BuxinEV = {
   /**
    * Render free tier can take 30–90s to cold-start. Retry network errors and 502/503/504.
    */
-  async fetchWithColdStartRetry(url, options = {}) {
-    const maxAttempts = 6;
-    const backoffMs = [3000, 5000, 8000, 12000, 15000];
+  async fetchWithColdStartRetry(url, options = {}, { maxAttempts = 6 } = {}) {
+    const backoffMs = [2000, 3000, 5000, 8000, 12000];
     let lastNetworkError = null;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       if (attempt > 0) {
@@ -322,15 +320,18 @@ const BuxinEV = {
     }
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    this._startWakeInBackground();
-    await this.ensureAwake(1500);
+    // Wake/keepalive runs in parallel — never blocks posts, comments, or likes.
+    void this._startWakeInBackground();
+
+    const method = (options.method || 'GET').toUpperCase();
+    const write = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
 
     let res;
     try {
       res = await this.fetchWithColdStartRetry(`${this.API_URL}${endpoint}`, {
         ...options,
         headers,
-      });
+      }, { maxAttempts: write ? 4 : 6 });
     } catch {
       throw {
         error:
@@ -442,21 +443,21 @@ const BuxinEV = {
     return false;
   },
 
-  /** Start wake in background — never blocks the UI for a full cold-start retry chain. */
+  /**
+   * Wake Render + DB in the background only. Does not block posting or other actions.
+   */
   _startWakeInBackground() {
     if (this.isBackendWarm() || this._wakePromise) return;
-    this._wakePromise = this.pingBackend({ aggressive: true }).finally(() => {
+    this._wakePromise = this.pingBackend({ aggressive: false }).finally(() => {
       this._wakePromise = null;
     });
   },
 
-  /**
-   * Brief wait for wake (max ~1.5s). API calls proceed either way so post #2 is not stuck.
-   */
-  async ensureAwake(maxWaitMs = 1500) {
+  /** Optional wait — not used before API calls (keepalive only). */
+  async ensureAwake(maxWaitMs = 0) {
     if (this.isBackendWarm()) return true;
-    this._startWakeInBackground();
-    if (!this._wakePromise || maxWaitMs <= 0) return this.isBackendWarm();
+    void this._startWakeInBackground();
+    if (maxWaitMs <= 0 || !this._wakePromise) return this.isBackendWarm();
     await Promise.race([
       this._wakePromise,
       new Promise((resolve) => setTimeout(resolve, maxWaitMs)),
@@ -486,8 +487,8 @@ const BuxinEV = {
   },
 
   wakeBackendIfNeeded() {
-    this._startWakeInBackground();
-    return this.ensureAwake(1500);
+    void this._startWakeInBackground();
+    return Promise.resolve(this.isBackendWarm());
   },
 
   cacheGet(key) {
