@@ -218,10 +218,28 @@ const BuxinEV = {
     });
     this.updatePriceElements();
   },
+
+  /**
+   * Free hosts (e.g. Render) sleep until traffic hits the API. Static site open ≠ API traffic.
+   * Ping once per tab so opening the site starts wake + confirms DB (`db: 1` from SELECT 1).
+   */
+  async wakeBackendIfNeeded() {
+    if (sessionStorage.getItem('buxinev_wake_ok')) return;
+    try {
+      const res = await this.fetchWithColdStartRetry(`${this.API_URL}/api/wake`, {
+        method: 'GET',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.db === 1) sessionStorage.setItem('buxinev_wake_ok', '1');
+    } catch {
+      /* Login and other actions still use api() retries */
+    }
+  },
 };
 
 document.addEventListener('DOMContentLoaded', () => {
   BuxinEV.initTheme();
   BuxinEV.initNav();
+  void BuxinEV.wakeBackendIfNeeded();
 });
 
