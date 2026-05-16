@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | Buxin Academy</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/responsive.css">
+  <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
+</head>
+<body data-page="dashboard">
+  <nav class="navbar">
+    <div class="container">
+      <a href="home.html" class="logo">🤖 Buxin Academy</a>
+      <div class="nav-actions">
+        <button id="theme-toggle">🌙</button>
+        <a href="#" id="logout-btn" class="btn btn-sm btn-secondary">Logout</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container dashboard-layout">
+    <aside class="sidebar glass">
+      <img id="user-avatar" class="hidden" style="width:64px;height:64px;border-radius:50%;margin-bottom:1rem" alt="">
+      <p><strong id="user-name">—</strong></p>
+      <p class="text-sm opacity-70" id="user-email">—</p>
+      <ul class="sidebar-nav mt-3">
+        <li><a href="dashboard.html" class="active">Dashboard</a></li>
+        <li><a href="community.html">Community</a></li>
+        <li><a href="payment.html">Payment</a></li>
+        <li><a href="#" id="logout-btn-side">Logout</a></li>
+      </ul>
+    </aside>
+
+    <main class="dashboard-main">
+      <div class="glass" style="padding:1.25rem">
+        <span class="status-badge status-active" id="user-status">active</span>
+        <p class="mt-2"><strong>Class:</strong> <span id="user-class">—</span></p>
+        <p><strong>Country:</strong> <span id="user-country">—</span></p>
+        <p id="class-countdown" class="mt-3 text-sm"></p>
+      </div>
+
+      <div class="glass" style="padding:1.25rem">
+        <h3>Live Classes</h3>
+        <div id="class-links" class="mt-3"></div>
+      </div>
+
+      <div id="schedule-info" class="glass hidden" style="padding:1.25rem"></div>
+
+      <div class="glass" style="padding:1.25rem">
+        <h3>Payment Status</h3>
+        <div id="payment-status-card" class="mt-2"></div>
+      </div>
+
+      <div class="glass" style="padding:1.25rem">
+        <h3>Notifications</h3>
+        <div id="notifications-list" class="mt-2"></div>
+      </div>
+    </main>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/payments.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script>document.getElementById('logout-btn-side')?.addEventListener('click', (e) => { e.preventDefault(); Auth.logout(); });</script>
+</body>
+</html>
+
+
+

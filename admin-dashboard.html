@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin | Buxin Academy</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body data-page="admin">
+  <nav class="navbar"><div class="container"><span class="logo">🔐 Admin Dashboard</span><a href="#" id="logout-btn" class="btn btn-sm btn-secondary">Logout</a></div></nav>
+
+  <main class="container" style="padding:1.5rem 1rem">
+    <div class="stat-grid mb-4">
+      <div class="stat-card glass"><p class="num" id="stat-total-students">0</p><p class="text-sm">Students</p></div>
+      <div class="stat-card glass"><p class="num" id="stat-active-students">0</p><p class="text-sm">Active</p></div>
+      <div class="stat-card glass"><p class="num" id="stat-pending-payments">0</p><p class="text-sm">Pending Pay</p></div>
+      <div class="stat-card glass"><p class="num" id="stat-pending-students">0</p><p class="text-sm">Pending</p></div>
+    </div>
+
+    <div class="admin-tabs">
+      <button class="active" data-tab="panel-payments">Payments</button>
+      <button data-tab="panel-students">Students</button>
+      <button data-tab="panel-classes">Classes</button>
+      <button data-tab="panel-schedules">Schedules</button>
+    </div>
+
+    <section id="panel-payments">
+      <div class="flex gap-2 mb-3 flex-wrap">
+        <select id="payment-filter" class="input" style="width:auto;margin:0">
+          <option value="">All statuses</option>
+          <option value="pending">Pending</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <select id="payment-country-filter" class="input" style="width:auto;margin:0">
+          <option value="">All countries</option>
+          <option value="GM">Gambia</option>
+          <option value="NG">Nigeria</option>
+          <option value="GH">Ghana</option>
+          <option value="KE">Kenya</option>
+        </select>
+        <select id="payment-class-filter" class="input" style="width:auto;margin:0">
+          <option value="">All classes</option>
+          <option value="group">Group only</option>
+          <option value="individual">Individual only</option>
+        </select>
+      </div>
+      <div class="table-wrap glass" style="padding:1rem">
+        <table>
+          <thead>
+            <tr>
+              <th>Student</th><th>Email</th><th>Class</th><th>Country</th><th>Method</th>
+              <th>Receipt</th><th>Status</th><th>Date</th><th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="payments-table"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="panel-students" class="hidden">
+      <div class="flex gap-2 mb-3 flex-wrap">
+        <input type="search" id="student-search" class="input" placeholder="Search students..." style="margin:0;flex:1;min-width:200px">
+        <select id="filter-status" class="input" style="width:auto;margin:0">
+          <option value="">All</option><option value="pending">Pending</option><option value="active">Active</option><option value="rejected">Rejected</option>
+        </select>
+        <select id="filter-country" class="input" style="width:auto;margin:0">
+          <option value="">All countries</option>
+          <option value="GM">GM</option><option value="NG">NG</option><option value="KE">KE</option>
+        </select>
+        <select id="filter-class" class="input" style="width:auto;margin:0">
+          <option value="">All classes</option>
+          <option value="group">Group only</option>
+          <option value="individual">Individual only</option>
+        </select>
+      </div>
+      <div class="table-wrap glass" style="padding:1rem">
+        <table>
+          <thead><tr><th>Photo</th><th>Name</th><th>Email</th><th>Country</th><th>Class</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead>
+          <tbody id="students-table"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="panel-classes" class="hidden">
+      <form id="create-class-form" class="glass" style="padding:1.5rem;max-width:500px">
+        <h3 class="mb-3">Schedule Live Class</h3>
+        <div class="form-group"><label>Title</label><input name="title" value="Sunday Robotics Class" required></div>
+        <div class="form-group"><label>Type</label><select name="class_type"><option value="group">Group</option><option value="individual">Individual</option></select></div>
+        <div class="form-group"><label>Date &amp; Time</label><input type="datetime-local" name="scheduled_at"></div>
+        <div class="form-group"><label>Google Meet Link</label><input name="meet_link" placeholder="https://meet.google.com/..."></div>
+        <div class="form-group"><label>Zoom Link</label><input name="zoom_link" placeholder="https://zoom.us/..."></div>
+        <label><input type="checkbox" name="is_live"> Mark as LIVE now</label>
+        <button type="submit" class="btn btn-primary btn-block mt-3">Create Class</button>
+      </form>
+      <form id="announcement-form" class="glass mt-4" style="padding:1.5rem;max-width:500px">
+        <h3 class="mb-3">Community Announcement</h3>
+        <div class="form-group"><label>Title</label><input name="title"></div>
+        <div class="form-group"><label>Message</label><textarea name="message" rows="3" required></textarea></div>
+        <div class="form-group"><label>Meet Link</label><input name="meet_link"></div>
+        <div class="form-group"><label>Zoom Link</label><input name="zoom_link"></div>
+        <button type="submit" class="btn btn-secondary btn-block">Post to Community</button>
+      </form>
+    </section>
+
+    <section id="panel-schedules" class="hidden">
+      <form id="schedule-form" class="glass" style="padding:1.5rem;max-width:400px">
+        <h3 class="mb-3">Add Time Slot</h3>
+        <div class="form-group"><label>Day</label>
+          <select name="day">
+            <option>Monday</option><option>Tuesday</option><option>Wednesday</option>
+            <option>Thursday</option><option>Friday</option><option>Saturday</option>
+          </select>
+        </div>
+        <div class="form-group"><label>Time</label><input name="time" placeholder="6:00 PM" required></div>
+        <button type="submit" class="btn btn-primary btn-block">Add Slot</button>
+      </form>
+    </section>
+  </main>
+
+  <div id="student-view-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="student-view-title">
+    <div class="modal-panel glass">
+      <div class="modal-head"><h3 id="student-view-title">Student details</h3><button type="button" class="btn btn-sm btn-secondary" id="student-view-close">Close</button></div>
+      <div id="student-view-body" class="modal-body text-sm"></div>
+    </div>
+  </div>
+
+  <div id="student-edit-modal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-panel glass">
+      <div class="modal-head"><h3>Edit student</h3><button type="button" class="btn btn-sm btn-secondary" id="student-edit-close">Close</button></div>
+      <form id="student-edit-form" class="modal-body">
+        <input type="hidden" name="id" id="edit-student-id">
+        <div class="form-group"><label>Email</label><input id="edit-email" type="email" readonly class="input opacity-70"></div>
+        <div class="form-group"><label>Full name</label><input name="full_name" id="edit-full_name" required class="input"></div>
+        <div class="form-group"><label>Phone</label><input name="phone" id="edit-phone" class="input"></div>
+        <div class="form-group"><label>City</label><input name="city" id="edit-city" class="input"></div>
+        <div class="form-group"><label>Country code</label><input name="country_code" id="edit-country_code" maxlength="5" class="input" placeholder="GM"></div>
+        <div class="form-group"><label>Class</label><select name="class_type" id="edit-class_type" class="input"><option value="group">Group</option><option value="individual">Individual</option></select></div>
+        <div class="form-group"><label>Experience</label><input name="experience_level" id="edit-experience_level" class="input"></div>
+        <div class="form-group"><label>Learning goals</label><textarea name="learning_goals" id="edit-learning_goals" rows="2" class="input"></textarea></div>
+        <div class="form-group"><label>Status</label><select name="status" id="edit-status" class="input"><option value="pending">pending</option><option value="active">active</option><option value="rejected">rejected</option></select></div>
+        <div class="form-group"><label>New password <span class="opacity-60">(optional)</span></label><input name="new_password" id="edit-new_password" type="password" class="input" autocomplete="new-password" placeholder="Leave blank to keep current"></div>
+        <button type="submit" class="btn btn-primary btn-block">Save changes</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>
+
+
+

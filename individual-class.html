@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Individual Mentorship | Buxin Academy</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/responsive.css">
+</head>
+<body>
+  <nav class="navbar"><div class="container"><a href="home.html" class="logo">🤖 Buxin Academy</a></div></nav>
+
+  <main class="container" style="padding:2rem 1rem;max-width:640px">
+    <span class="hero-badge">One-on-One Mentorship</span>
+    <h1>Individual Robotics Class</h1>
+    <p class="opacity-70 mb-2"><strong data-price-individual>D7,250.00</strong> · Flexible schedule</p>
+
+    <section id="register-section" class="glass" style="padding:1.5rem;margin-top:1rem">
+      <h2 class="mb-4">Step 1 — Register</h2>
+      <form id="individual-register-form">
+        <div class="form-group"><label>Full Name *</label><input type="text" name="full_name" required></div>
+        <div class="form-group"><label>Email *</label><input type="email" name="email" required></div>
+        <div class="form-group"><label>Phone *</label><input type="tel" name="phone" required></div>
+        <div class="form-group"><label>City *</label><input type="text" name="city" required></div>
+        <div class="form-group"><label>Password *</label><input type="password" name="password" required minlength="6"></div>
+        <div class="form-group">
+          <label>Experience Level</label>
+          <select name="experience_level"><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select>
+        </div>
+        <div class="form-group"><label>Learning Goals</label><textarea name="learning_goals" rows="2"></textarea></div>
+        <button type="submit" class="btn btn-primary btn-block">Next: Choose Schedule</button>
+      </form>
+    </section>
+
+    <section id="schedule-section" class="glass hidden" style="padding:1.5rem;margin-top:1rem">
+      <h2>Step 2 — Pick 2 Preferred Times</h2>
+      <p class="text-sm opacity-70 mb-3">Select up to two slots that work for you</p>
+      <div id="schedule-slots" class="schedule-slots"></div>
+      <button id="schedule-continue" class="btn btn-primary btn-block mt-3">Continue to Payment</button>
+    </section>
+  </main>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/schedule.js"></script>
+  <script>
+    if (!localStorage.getItem('buxinev_country')) location.href = 'index.html';
+    const params = new URLSearchParams(location.search);
+    if (params.get('step') === 'schedule' && Auth.isLoggedIn()) {
+      document.getElementById('register-section').classList.add('hidden');
+      document.getElementById('schedule-section').classList.remove('hidden');
+      SchedulePicker.init();
+    }
+    document.getElementById('individual-register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const btn = e.target.querySelector('[type=submit]');
+      btn.disabled = true;
+      const email = fd.get('email');
+      try {
+        await Auth.register({
+          full_name: fd.get('full_name'), email, phone: fd.get('phone'),
+          city: fd.get('city'), password: fd.get('password'),
+          country_code: BuxinEV.getCountryCode(), class_type: 'individual',
+          experience_level: fd.get('experience_level'), learning_goals: fd.get('learning_goals'),
+        });
+        document.getElementById('register-section').classList.add('hidden');
+        document.getElementById('schedule-section').classList.remove('hidden');
+        SchedulePicker.init();
+      } catch (err) {
+        if (!Auth.handleRegisterError(err, email, 'individual')) {
+          BuxinEV.showToast(err.error || 'Failed', 'error');
+        }
+      }
+      finally { btn.disabled = false; }
+    });
+    document.getElementById('schedule-continue').addEventListener('click', async () => {
+      if (!Auth.isLoggedIn()) { location.href = 'individual-class.html'; return; }
+      const ok = await SchedulePicker.saveSelections();
+      if (ok) location.href = 'payment.html?type=individual';
+    });
+  </script>
+</body>
+</html>
+
+
+
