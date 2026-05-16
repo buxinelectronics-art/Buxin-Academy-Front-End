@@ -478,9 +478,15 @@ const BuxinEV = {
   cacheSet(key, value) {
     try {
       sessionStorage.setItem(`buxinev_cache_${key}`, JSON.stringify(value));
+      sessionStorage.setItem(`buxinev_cache_ts_${key}`, String(Date.now()));
     } catch {
       /* quota */
     }
+  },
+
+  cacheFresh(key, maxAgeMs = 5 * 60 * 1000) {
+    const ts = parseInt(sessionStorage.getItem(`buxinev_cache_ts_${key}`) || '0', 10) || 0;
+    return ts > 0 && Date.now() - ts < maxAgeMs;
   },
 };
 

@@ -56,8 +56,19 @@ const Community = {
     return html;
   },
 
+  hydrateFeedFromCache() {
+    const feed = document.getElementById('community-feed');
+    const cachedPosts = BuxinEV.cacheGet('community_posts');
+    const user = Auth.getUser();
+    if (feed && cachedPosts?.length) {
+      feed.innerHTML = cachedPosts.map((p) => this.renderPost(p, user)).join('');
+    }
+  },
+
   async init() {
     if (!Auth.requireAuth()) return;
+    this.hydrateFeedFromCache();
+    BuxinEV.initStudentNav('community');
 
     const cached = Auth.getUser();
     if (cached && this.canUse(cached)) {
@@ -70,17 +81,9 @@ const Community = {
       }
     }
 
-    BuxinEV.initStudentNav('community');
-
-    const feed = document.getElementById('community-feed');
-    const cachedPosts = BuxinEV.cacheGet('community_posts');
-    if (cachedPosts?.length && feed) {
-      feed.innerHTML = cachedPosts.map((p) => this.renderPost(p, Auth.getUser())).join('');
-    }
-
     this.bindEvents();
     this.initSocket();
-    void this.loadPosts();
+    void this.loadPosts({ silent: BuxinEV.cacheFresh('community_posts') });
   },
 
   initSocket() {
@@ -370,7 +373,7 @@ const Community = {
     }
   },
 
-  async loadPosts() {
+  async loadPosts({ silent = false } = {}) {
     const feed = document.getElementById('community-feed');
     if (!feed) return;
 
@@ -380,7 +383,7 @@ const Community = {
     const gen = ++this._feedLoadGen;
 
     const hasPosts = feed.querySelector('.post-card');
-    if (!hasPosts && !BuxinEV.cacheGet('community_posts')?.length) {
+    if (!silent && !hasPosts) {
       feed.innerHTML = '<p class="loading-pulse opacity-70">Loading…</p>';
     }
 

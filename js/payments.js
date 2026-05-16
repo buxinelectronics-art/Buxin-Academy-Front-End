@@ -537,9 +537,15 @@ const Payments = {
 
 
   async initPaymentPage() {
-    const cached = Auth.getUser();
-    if (cached) await Auth.updateNavLinks(cached);
     BuxinEV.initStudentNav('payment');
+    const cached = Auth.getUser();
+    if (cached) void Auth.updateNavLinks(cached);
+
+    const historyList = document.getElementById('payment-history-list');
+    const cachedPay = BuxinEV.cacheGet('payments');
+    if (cachedPay?.length && historyList) {
+      historyList.innerHTML = this.renderHistoryList(cachedPay);
+    }
 
     if (!Auth.isLoggedIn()) {
 
@@ -557,7 +563,7 @@ const Payments = {
 
     if (cached && Auth.isSubscriptionActive(cached)) {
       void Auth.refreshUserInBackground();
-      return this.initPaymentHistory(cached);
+      return this.initPaymentHistory();
     }
 
     const user = cached || await Auth.refreshUserFresh();
@@ -738,7 +744,7 @@ const Payments = {
 
   },
 
-  async initPaymentHistory(user) {
+  async initPaymentHistory() {
     document.getElementById('payment-checkout')?.classList.add('hidden');
     document.getElementById('payment-amount')?.classList.add('hidden');
     document.getElementById('class-type-label')?.classList.add('hidden');
@@ -754,6 +760,12 @@ const Payments = {
     const cached = BuxinEV.cacheGet('payments');
     if (cached?.length && list) {
       list.innerHTML = this.renderHistoryList(cached);
+    } else if (list && !list.innerHTML.trim()) {
+      list.innerHTML = '<p class="opacity-70">Loading payment history…</p>';
+    }
+
+    if (BuxinEV.cacheFresh('payments') && BuxinEV._recentlyConnected()) {
+      return;
     }
 
     void (async () => {

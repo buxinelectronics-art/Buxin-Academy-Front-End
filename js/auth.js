@@ -239,18 +239,24 @@ const Auth = {
     if (!this.isLoggedIn()) return;
     const page = this.currentPage();
     const cached = this.getUser();
-    if (cached) await this.updateNavLinks(cached);
+
+    const appPages = [...this.ACTIVE_ONLY_PAGES, 'dashboard.html', 'payment.html'];
+    if (cached && this.isSubscriptionActive(cached) && appPages.includes(page)) {
+      void this.updateNavLinks(cached);
+      void this.refreshUser({ allowStale: true }).then((fresh) => {
+        if (!fresh) return;
+        this.saveSession(localStorage.getItem('buxinev_token'), fresh);
+        if (!this.isSubscriptionActive(fresh)) {
+          void this.resolvePendingRedirect(fresh).then((dest) => { window.location.href = dest; });
+        }
+      });
+      return;
+    }
+
+    if (cached) void this.updateNavLinks(cached);
     const user = cached || await this.refreshUserFresh();
     if (!user) return;
-
-    if (cached && this.ACTIVE_ONLY_PAGES.includes(page)) {
-      void this.refreshUser({ allowStale: true }).then((fresh) => {
-        if (!fresh || this.isSubscriptionActive(fresh)) return;
-        void this.resolvePendingRedirect(fresh).then((dest) => { window.location.href = dest; });
-      });
-    } else {
-      void this.refreshUserInBackground();
-    }
+    void this.refreshUserInBackground();
 
     if (user.role === 'admin') {
       if (this.ACTIVE_ONLY_PAGES.includes(page)) {

@@ -11,75 +11,73 @@ const Dashboard = {
     BuxinEV.requireCountry();
     BuxinEV.initStudentNav('dashboard');
 
-
-
     const cached = Auth.getUser();
-
     if (cached) {
-
       this.renderProfile(cached);
-
       this.hydrateFromCache();
-
     }
-
-
 
     void Auth.refreshUserInBackground();
 
-    const user = cached || await Auth.refreshUserFresh();
-
-    if (!user) return;
+    const user = cached;
+    if (!user) {
+      const fresh = await Auth.refreshUserFresh();
+      if (!fresh) return;
+      if (fresh.role === 'admin') {
+        window.location.href = 'admin-dashboard.html';
+        return;
+      }
+      if (!Auth.isSubscriptionActive(fresh)) {
+        window.location.replace(await Auth.resolvePendingRedirect(fresh));
+        return;
+      }
+      this.renderProfile(fresh);
+      if (fresh.class_type === 'individual') {
+        document.getElementById('schedule-info')?.classList.remove('hidden');
+      }
+      void this.refreshAllSections(fresh, { useCache: false });
+      this.initSocket(fresh.id);
+      this.startCountdown();
+      return;
+    }
 
     if (user.role === 'admin') {
-
       window.location.href = 'admin-dashboard.html';
-
       return;
-
     }
 
     if (!Auth.isSubscriptionActive(user)) {
-
-      window.location.replace(await Auth.resolvePendingRedirect(user));
-
+      void Auth.refreshUserFresh().then((fresh) => {
+        if (fresh && !Auth.isSubscriptionActive(fresh)) {
+          void Auth.resolvePendingRedirect(fresh).then((dest) => { window.location.replace(dest); });
+        }
+      });
       return;
-
     }
-
-
-
-    this.renderProfile(user);
 
     if (user.class_type === 'individual') {
-
       document.getElementById('schedule-info')?.classList.remove('hidden');
-
     }
 
-
-
-    void Promise.all([
-
-      this.loadPayments(),
-
-      this.loadNotifications(),
-
-      this.loadClasses(),
-
-      user.class_type === 'individual' ? this.loadSchedules() : Promise.resolve(),
-
-    ]);
+    const cacheOk = BuxinEV._recentlyConnected()
+      && (BuxinEV.cacheFresh('payments') || BuxinEV.cacheFresh('notifications') || BuxinEV.cacheFresh('classes'));
+    void this.refreshAllSections(user, { useCache: cacheOk });
 
 
 
     this.initSocket(user.id);
-
     this.startCountdown();
-
   },
 
-
+  refreshAllSections(user, { useCache = false } = {}) {
+    if (useCache && BuxinEV._recentlyConnected()) return;
+    void Promise.all([
+        this.loadPayments(),
+        this.loadNotifications(),
+        this.loadClasses(),
+        user.class_type === 'individual' ? this.loadSchedules() : Promise.resolve(),
+    ]);
+  },
 
   hydrateFromCache() {
 
@@ -96,9 +94,23 @@ const Dashboard = {
 
 
     const classes = BuxinEV.cacheGet('classes');
-
     if (classes) this.renderClasses(classes);
 
+    const schedules = BuxinEV.cacheGet('student_schedules');
+    if (schedules?.length) {
+      const el = document.getElementById('schedule-info');
+      const list = document.getElementById('schedule-info-list');
+      if (el) el.classList.remove('hidden');
+      if (list) {
+        list.innerHTML = schedules.map((s) => {
+          const sch = s.schedule;
+          const line = sch
+            ? `<strong>${sch.day_of_week}</strong> · ${sch.time_slot} <span class="opacity-70">(IST)</span>`
+            : '—';
+          return `<p class="mb-2">Session ${s.preference_order}: ${line}</p>`;
+        }).join('');
+      }
+    }
   },
 
 
@@ -373,6 +385,7 @@ const Dashboard = {
       const el = document.getElementById('schedule-info');
       const list = document.getElementById('schedule-info-list');
 
+      BuxinEV.cacheSet('student_schedules', schedules);
       if (el && schedules.length) {
         el.classList.remove('hidden');
         const html = schedules.map((s) => {
