@@ -292,20 +292,31 @@ const BuxinEV = {
   /**
    * Render free tier can take 30–90s to cold-start. Retry network errors and 502/503/504.
    */
-  async fetchWithColdStartRetry(url, options = {}, { maxAttempts = 6 } = {}) {
-    const backoffMs = [2000, 3000, 5000, 8000, 12000];
+  async fetchWithColdStartRetry(url, options = {}, { maxAttempts = 6, timeoutMs = 20000 } = {}) {
+    const backoffMs = [1500, 2500, 4000, 6000, 8000];
     let lastNetworkError = null;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       if (attempt > 0) {
-        await new Promise((r) => setTimeout(r, backoffMs[attempt - 1]));
+        await new Promise((r) => setTimeout(r, backoffMs[attempt - 1] || 3000));
       }
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      const signals = [controller.signal];
+      if (options.signal) signals.push(options.signal);
+      const onAbort = () => controller.abort();
+      options.signal?.addEventListener('abort', onAbort);
       try {
-        const res = await fetch(url, options);
+        const res = await fetch(url, { ...options, signal: controller.signal });
+        clearTimeout(timer);
+        options.signal?.removeEventListener('abort', onAbort);
         if ([502, 503, 504].includes(res.status) && attempt < maxAttempts - 1) {
           continue;
         }
         return res;
       } catch (err) {
+        clearTimeout(timer);
+        options.signal?.removeEventListener('abort', onAbort);
+        if (err?.name === 'AbortError' && options.signal?.aborted) throw err;
         lastNetworkError = err;
       }
     }
@@ -320,22 +331,29 @@ const BuxinEV = {
     }
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    // Wake/keepalive runs in parallel — never blocks posts, comments, or likes.
     void this._startWakeInBackground();
 
     const method = (options.method || 'GET').toUpperCase();
     const write = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+    const read = !write;
 
     let res;
     try {
       res = await this.fetchWithColdStartRetry(`${this.API_URL}${endpoint}`, {
         ...options,
         headers,
-      }, { maxAttempts: write ? 4 : 6 });
-    } catch {
+      }, {
+        maxAttempts: write ? 2 : 3,
+        timeoutMs: write ? 25000 : 12000,
+      });
+    } catch (err) {
+      if (err?.name === 'AbortError' || options.signal?.aborted) {
+        throw { error: 'Request cancelled.', aborted: true };
+      }
       throw {
-        error:
-          'Cannot reach API — the server may still be starting (free hosting). Wait a minute and try again.',
+        error: read
+          ? 'Could not refresh feed. Try again.'
+          : 'Cannot reach server — try again in a moment.',
         network: true,
       };
     }

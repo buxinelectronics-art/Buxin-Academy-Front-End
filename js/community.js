@@ -1,7 +1,8 @@
 const Community = {
   socket: null,
-  _posting: false,
-  _postingSince: 0,
+  _eventsBound: false,
+  _feedLoadGen: 0,
+  _feedLoadAbort: null,
   _previewUrl: null,
   _compressedBlob: null,
   _compressing: false,
@@ -33,34 +34,43 @@ const Community = {
       feed.innerHTML = cachedPosts.map((p) => this.renderPost(p, Auth.getUser())).join('');
     }
 
-    BuxinEV._startWakeInBackground();
+    void BuxinEV._startWakeInBackground();
     this.bindEvents();
-    await this.loadPosts();
     this.initSocket();
+    void this.loadPosts();
   },
 
   initSocket() {
     if (typeof io === 'undefined') return;
+    if (this.socket) return;
     this.socket = io(BuxinEV.API_URL, { transports: ['websocket', 'polling'] });
     this.socket.emit('join', { room: 'community' });
-    this.socket.on('new_post', (payload) => {
-      if (this._posting) return;
-      if (Date.now() - this._lastLocalPostAt < 4000) return;
-      if (payload?.id && document.querySelector(`[data-post-id="${payload.id}"]`)) return;
-      void this.loadPosts();
-    });
+    this.socket.on('new_post', (post) => this.onSocketNewPost(post));
     this.socket.on('new_comment', (data) => {
       if (data?.post_id) this.appendCommentToPost(data.post_id, data.comment);
     });
     this.socket.on('post_deleted', (data) => {
       if (data?.id) document.querySelector(`[data-post-id="${data.id}"]`)?.remove();
     });
-    this.socket.on('post_updated', () => {
-      if (!this._posting) void this.loadPosts();
+    this.socket.on('post_updated', (post) => {
+      if (post?.id) this.onSocketNewPost(post);
     });
   },
 
+  onSocketNewPost(post) {
+    if (!post?.id) return;
+    if (document.querySelector(`[data-post-id="${post.id}"]`)) return;
+    if (Date.now() - this._lastLocalPostAt < 30000) {
+      this.prependPost(post);
+      return;
+    }
+    this.prependPost(post);
+  },
+
   bindEvents() {
+    if (this._eventsBound) return;
+    this._eventsBound = true;
+
     const form = document.getElementById('post-form');
     form?.addEventListener('submit', (e) => {
       void this.submitPost(e);
@@ -98,6 +108,12 @@ const Community = {
     });
   },
 
+  cancelFeedLoad() {
+    this._feedLoadGen += 1;
+    this._feedLoadAbort?.abort();
+    this._feedLoadAbort = null;
+  },
+
   setImagePreview(file) {
     const preview = document.getElementById('post-image-preview');
     if (!preview) return;
@@ -125,6 +141,15 @@ const Community = {
       el.textContent = '';
       el.classList.add('hidden');
     }
+  },
+
+  releasePostForm(form, btn, prevLabel) {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = prevLabel || 'Post';
+    }
+    form?.classList.remove('is-submitting');
+    this.setUploadStatus('');
   },
 
   async prepareImageInBackground(file) {
@@ -156,36 +181,28 @@ const Community = {
     const feed = document.getElementById('community-feed');
     if (!feed) return;
     feed.querySelector('.empty-state')?.remove();
-    const html = `
+    feed.insertAdjacentHTML('afterbegin', `
       <article class="post-card glass post-pending" data-pending-id="${pendingId}">
         <p class="pending-label">Uploading your post…</p>
         <header class="post-header">
           <div class="avatar-sm">${user?.full_name?.[0] || '?'}</div>
-          <div><strong>${this.escape(user?.full_name || 'You')}</strong><small>Just now</small></div>
+          <div><strong>${this.escape(user?.full_name || 'You')}</strong> <small>Just now</small></div>
         </header>
         ${content ? `<p class="post-content">${this.escape(content)}</p>` : ''}
         ${localImageUrl ? `<img src="${localImageUrl}" alt="" class="post-image">` : ''}
-      </article>`;
-    feed.insertAdjacentHTML('afterbegin', html);
+      </article>`);
   },
 
   removePendingPost(pendingId) {
     document.querySelector(`[data-pending-id="${pendingId}"]`)?.remove();
   },
 
-  _resetPostingIfStuck() {
-    if (this._posting && Date.now() - this._postingSince > 12000) {
-      this._posting = false;
-    }
-  },
-
   async submitPost(e) {
     e.preventDefault();
-    this._resetPostingIfStuck();
+    this.cancelFeedLoad();
 
     const form = e.currentTarget;
     const btn = document.getElementById('post-submit-btn') || form.querySelector('[type=submit]');
-    if (btn?.disabled) return;
     const contentEl = document.getElementById('post-content');
     const content = contentEl?.value.trim() || '';
     const file = document.getElementById('post-image')?.files?.[0];
@@ -198,18 +215,21 @@ const Community = {
     const pendingId = `pending-${Date.now()}`;
     let localPreviewUrl = null;
 
-    this._posting = true;
-    this._postingSince = Date.now();
     if (btn) {
       btn.disabled = true;
       btn.textContent = file ? 'Preparing…' : 'Posting…';
     }
     form.classList.add('is-submitting');
 
+    if (!file) {
+      contentEl.value = '';
+      this.releasePostForm(form, btn, prevLabel);
+    }
+
     try {
       let result;
       if (file) {
-        this.setUploadStatus('Preparing photo (smaller size for faster upload)…');
+        this.setUploadStatus('Preparing photo…');
         let blob = this._compressedBlob;
         if (!blob) {
           blob = await BuxinEV.compressImageToBlob(file);
@@ -217,7 +237,7 @@ const Community = {
         }
         localPreviewUrl = URL.createObjectURL(blob);
         this.prependPendingPost({ pendingId, content, localImageUrl: localPreviewUrl });
-        this.setUploadStatus('Uploading to server…');
+        this.setUploadStatus('Uploading…');
         if (btn) btn.textContent = 'Uploading…';
 
         const fd = new FormData();
@@ -225,7 +245,6 @@ const Community = {
         fd.append('image', blob, 'photo.jpg');
         result = await BuxinEV.apiMultipart('/api/community/posts', fd);
       } else {
-        this.setUploadStatus('Sending…');
         result = await BuxinEV.api('/api/community/posts', {
           method: 'POST',
           body: JSON.stringify({ content }),
@@ -241,16 +260,11 @@ const Community = {
       BuxinEV.showToast('Post shared!', 'success');
     } catch (err) {
       this.removePendingPost(pendingId);
+      if (!file && content) contentEl.value = content;
       BuxinEV.showToast(err.error || 'Failed to post', 'error');
-      this.setUploadStatus('');
     } finally {
       if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
-      this._posting = false;
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = prevLabel;
-      }
-      form.classList.remove('is-submitting');
+      this.releasePostForm(form, btn, prevLabel);
     }
   },
 
@@ -259,6 +273,7 @@ const Community = {
     if (!feed) return;
     feed.querySelector('.empty-state')?.remove();
     feed.querySelector('.loading-pulse')?.remove();
+    if (document.querySelector(`[data-post-id="${post.id}"]`)) return;
     feed.insertAdjacentHTML('afterbegin', this.renderPost(post, Auth.getUser()));
     const cached = BuxinEV.cacheGet('community_posts') || [];
     BuxinEV.cacheSet('community_posts', [post, ...cached.filter((p) => p.id !== post.id)]);
@@ -279,22 +294,34 @@ const Community = {
 
   async loadPosts() {
     const feed = document.getElementById('community-feed');
-    if (!feed || this._posting) return;
+    if (!feed) return;
+
+    this._feedLoadAbort?.abort();
+    const controller = new AbortController();
+    this._feedLoadAbort = controller;
+    const gen = ++this._feedLoadGen;
+
     const hasPosts = feed.querySelector('.post-card');
     if (!hasPosts) {
       feed.innerHTML = '<p class="loading-pulse opacity-70">Loading…</p>';
     }
+
     try {
-      const { posts } = await BuxinEV.api('/api/community/posts');
+      const { posts } = await BuxinEV.api('/api/community/posts', { signal: controller.signal });
+      if (gen !== this._feedLoadGen) return;
       BuxinEV.cacheSet('community_posts', posts);
       const user = Auth.getUser();
       feed.innerHTML = posts.length
         ? posts.map((p) => this.renderPost(p, user)).join('')
         : '<div class="empty-state glass"><p>🤖 Be the first to share!</p></div>';
     } catch (err) {
+      if (err?.aborted || err?.name === 'AbortError') return;
+      if (gen !== this._feedLoadGen) return;
       if (!feed.querySelector('.post-card')) {
         feed.innerHTML = `<p class="error-text">${err.error || 'Could not load feed.'}</p>`;
       }
+    } finally {
+      if (this._feedLoadAbort === controller) this._feedLoadAbort = null;
     }
   },
 
@@ -376,8 +403,9 @@ const Community = {
       return;
     }
     const btn = document.querySelector(`[data-comment-btn="${postId}"]`);
-    const prevLabel = btn?.textContent;
+    const prevLabel = btn?.textContent || 'Post';
 
+    input.value = '';
     this._commenting.add(id);
     if (btn) {
       btn.disabled = true;
@@ -389,21 +417,22 @@ const Community = {
         method: 'POST',
         body: JSON.stringify({ content }),
       });
-      input.value = '';
       this.appendCommentToPost(postId, comment);
     } catch (err) {
+      input.value = content;
       BuxinEV.showToast(err.error || 'Comment failed', 'error');
     } finally {
       this._commenting.delete(id);
       if (btn) {
         btn.disabled = false;
-        btn.textContent = prevLabel || 'Post';
+        btn.textContent = prevLabel;
       }
     }
   },
 
   async deletePost(postId) {
     if (!confirm('Delete this post?')) return;
+    this.cancelFeedLoad();
     try {
       await BuxinEV.api(`/api/community/posts/${postId}`, { method: 'DELETE' });
       document.querySelector(`[data-post-id="${postId}"]`)?.remove();
