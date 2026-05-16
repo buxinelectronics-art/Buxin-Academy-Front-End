@@ -679,22 +679,34 @@ th { color: var(--text-muted); font-weight: 600; }
   border-color: var(--primary);
 }
 
-/* Schedule slots */
-.schedule-slots {
+/* Schedule slots (individual class — IST) */
+.schedule-rules {
+  padding: 1rem;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(0, 212, 170, 0.06);
+}
+.schedule-rules__list { margin: 0.5rem 0 0; padding-left: 1.2rem; }
+.schedule-rules__tz { margin: 0; }
+.schedule-slots-by-day { display: flex; flex-direction: column; gap: 1.25rem; }
+.schedule-day-group { border-bottom: 1px solid var(--border); padding-bottom: 1rem; }
+.schedule-day-group:last-child { border-bottom: 0; padding-bottom: 0; }
+.schedule-day-title { font-size: 1rem; margin: 0 0 0.65rem; color: var(--accent); }
+.schedule-slots-grid {
   display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
 }
 .schedule-slot {
-  padding: 1rem;
+  padding: 0.75rem;
   text-align: center;
   cursor: pointer;
   display: block;
 }
 .schedule-slot input { display: none; }
-.schedule-slot:has(input:checked) { border-color: var(--primary); background: rgba(0,212,170,0.1); }
-.slot-day { display: block; font-weight: 700; }
-.slot-time { color: var(--text-muted); font-size: 0.9rem; }
+.schedule-slot:has(input:checked) { border-color: var(--primary); background: rgba(0,212,170,0.12); }
+.slot-time { font-size: 0.85rem; line-height: 1.35; }
+.schedule-hint--ok { color: var(--accent); }
 
 /* Waiting page */
 .waiting-hero {

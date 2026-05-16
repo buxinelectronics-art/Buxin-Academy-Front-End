@@ -373,15 +373,19 @@ const Dashboard = {
       const { schedules } = await BuxinEV.api('/api/schedules/my');
 
       const el = document.getElementById('schedule-info');
+      const list = document.getElementById('schedule-info-list');
 
       if (el && schedules.length) {
-
-        el.innerHTML = schedules.map((s) =>
-
-          `<p>Preference ${s.preference_order}: <strong>${s.schedule?.label || '—'}</strong></p>`
-
-        ).join('');
-
+        el.classList.remove('hidden');
+        const html = schedules.map((s) => {
+          const sch = s.schedule;
+          const line = sch
+            ? `<strong>${sch.day_of_week}</strong> · ${sch.time_slot} <span class="opacity-70">(IST)</span>`
+            : '—';
+          return `<p class="mb-2">Session ${s.preference_order}: ${line}</p>`;
+        }).join('');
+        if (list) list.innerHTML = html;
+        else el.innerHTML = `<h3>Your class times (IST)</h3>${html}`;
       }
 
     } catch { /* silent */ }
