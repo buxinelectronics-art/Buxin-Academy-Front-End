@@ -235,7 +235,7 @@ const BuxinEV = {
     const token = localStorage.getItem('buxinev_token');
     const headers = {};
     if (token) headers.Authorization = `Bearer ${token}`;
-    void this._startWakeInBackground();
+    if (!this.isBackendWarm()) void this._startWakeInBackground({ force: true });
     let res;
     try {
       res = await this.fetchUploadWithRetry(`${this.API_URL}${endpoint}`, {
@@ -289,11 +289,23 @@ const BuxinEV = {
     });
   },
 
+  /** Retry/timeouts when Render may be asleep (free tier cold start ~30–90s). */
+  COLD_RETRY: { maxAttempts: 12, timeoutMs: 90000 },
+  NORMAL_RETRY: { maxAttempts: 3, timeoutMs: 20000 },
+  WRITE_RETRY: { maxAttempts: 4, timeoutMs: 90000 },
+
+  _retryOptionsForRequest(isWrite = false) {
+    if (this.isBackendWarm()) {
+      return isWrite ? { maxAttempts: 2, timeoutMs: 25000 } : this.NORMAL_RETRY;
+    }
+    return isWrite ? this.WRITE_RETRY : this.COLD_RETRY;
+  },
+
   /**
    * Render free tier can take 30–90s to cold-start. Retry network errors and 502/503/504.
    */
   async fetchWithColdStartRetry(url, options = {}, { maxAttempts = 6, timeoutMs = 20000 } = {}) {
-    const backoffMs = [1500, 2500, 4000, 6000, 8000];
+    const backoffMs = [1000, 2000, 3000, 4000, 5000, 6000, 8000, 10000, 12000, 15000];
     let lastNetworkError = null;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       if (attempt > 0) {
@@ -331,21 +343,18 @@ const BuxinEV = {
     }
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    void this._startWakeInBackground();
-
     const method = (options.method || 'GET').toUpperCase();
     const write = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
     const read = !write;
+    if (!this.isBackendWarm()) void this._startWakeInBackground({ force: true });
+    const retryOpts = this._retryOptionsForRequest(write);
 
     let res;
     try {
       res = await this.fetchWithColdStartRetry(`${this.API_URL}${endpoint}`, {
         ...options,
         headers,
-      }, {
-        maxAttempts: write ? 2 : 3,
-        timeoutMs: write ? 25000 : 12000,
-      });
+      }, retryOpts);
     } catch (err) {
       if (err?.name === 'AbortError' || options.signal?.aborted) {
         throw { error: 'Request cancelled.', aborted: true };
@@ -415,10 +424,10 @@ const BuxinEV = {
   _keepaliveTimer: null,
   _keepaliveStarted: false,
 
-  /** How long we consider the backend "warm" after a successful ping. */
-  WAKE_MAX_AGE_MS: 8 * 60 * 1000,
-  /** Ping while the tab is open so Render free tier does not sleep (idle ~15 min). */
-  KEEPALIVE_INTERVAL_MS: 3 * 60 * 1000,
+  /** How long we trust a successful wake (keepalive refreshes this). */
+  WAKE_MAX_AGE_MS: 12 * 60 * 1000,
+  /** Ping while tab is open — Render free tier sleeps after ~15 min with no traffic. */
+  KEEPALIVE_INTERVAL_MS: 90 * 1000,
 
   _getLastWakeAt() {
     return parseInt(sessionStorage.getItem('buxinev_last_wake') || '0', 10) || 0;
@@ -440,33 +449,36 @@ const BuxinEV = {
    * aggressive: long retry loop for cold start on first visit.
    */
   async pingBackend({ aggressive = false } = {}) {
-    const url = `${this.API_URL.replace(/\/$/, '')}/api/wake`;
-    const fetchOnce = () => fetch(url, { method: 'GET', mode: 'cors', cache: 'no-store' });
+    const base = this.API_URL.replace(/\/$/, '');
+    const url = `${base}/api/wake`;
+    const useColdRetry = aggressive || !this.isBackendWarm();
+
+    if (useColdRetry) {
+      fetch(`${base}/api/ping`, { method: 'GET', mode: 'cors', cache: 'no-store' }).catch(() => {});
+    }
 
     try {
-      let res;
-      if (aggressive) {
-        res = await this.fetchWithColdStartRetry(url, { method: 'GET', cache: 'no-store' });
-      } else {
-        res = await fetchOnce();
-      }
+      const res = useColdRetry
+        ? await this.fetchWithColdStartRetry(url, { method: 'GET', cache: 'no-store' }, this.COLD_RETRY)
+        : await fetch(url, { method: 'GET', mode: 'cors', cache: 'no-store' });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
         this._markWakeSuccess(data.db === 1);
         return data.db === 1;
       }
     } catch {
-      /* next api() call will retry */
+      /* api() uses longer cold-start retries */
     }
     return false;
   },
 
   /**
-   * Wake Render + DB in the background only. Does not block posting or other actions.
+   * Wake Render + DB in the background. Never blocks posts; cold start uses long retries on api().
    */
-  _startWakeInBackground() {
-    if (this.isBackendWarm() || this._wakePromise) return;
-    this._wakePromise = this.pingBackend({ aggressive: false }).finally(() => {
+  _startWakeInBackground({ force = false } = {}) {
+    if (this._wakePromise) return;
+    if (!force && this.isBackendWarm()) return;
+    this._wakePromise = this.pingBackend({ aggressive: !this.isBackendWarm() }).finally(() => {
       this._wakePromise = null;
     });
   },
@@ -494,12 +506,12 @@ const BuxinEV = {
 
     this._keepaliveTimer = setInterval(() => {
       if (document.visibilityState === 'hidden') return;
-      void this.pingBackend({ aggressive: false });
+      void this.pingBackend({ aggressive: !this.isBackendWarm() });
     }, this.KEEPALIVE_INTERVAL_MS);
 
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible' && !this.isBackendWarm()) {
-        this._startWakeInBackground();
+      if (document.visibilityState === 'visible') {
+        this._startWakeInBackground({ force: !this.isBackendWarm() });
       }
     });
   },
