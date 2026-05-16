@@ -41,7 +41,7 @@ const Dashboard = {
 
     }
 
-    if (user.status !== 'active') {
+    if (!Auth.isSubscriptionActive(user)) {
 
       window.location.replace(await Auth.resolvePendingRedirect(user));
 
@@ -160,6 +160,21 @@ const Dashboard = {
     const country = BuxinEV.COUNTRIES[user.country_code];
 
     set('user-country', country ? `${country.flag} ${country.name}` : user.country_code);
+
+    const subEl = document.getElementById('subscription-status');
+    if (subEl && user.subscription_expires_at) {
+      const exp = new Date(user.subscription_expires_at);
+      const daysLeft = Math.ceil((exp - Date.now()) / 86400000);
+      if (daysLeft > 0) {
+        subEl.textContent = `Monthly access until ${exp.toLocaleDateString()} (${daysLeft} day${daysLeft === 1 ? '' : 's'} left)`;
+        subEl.classList.remove('hidden', 'subscription-warning');
+        if (daysLeft <= 7) subEl.classList.add('subscription-warning');
+      } else {
+        subEl.textContent = 'Subscription ended — renew on the Payment page.';
+        subEl.classList.add('subscription-warning');
+        subEl.classList.remove('hidden');
+      }
+    }
 
   },
 
@@ -457,7 +472,7 @@ const WaitingPage = {
 
     if (!user) return;
 
-    if (user.status === 'active') {
+    if (Auth.isSubscriptionActive(user)) {
 
       Auth.onApproved(user);
 

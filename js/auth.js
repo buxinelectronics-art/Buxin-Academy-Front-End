@@ -8,11 +8,16 @@ const Auth = {
     'individual-class.html',
   ],
 
-  /** Pages allowed while payment is pending review */
-  PENDING_ALLOWED_PAGES: ['waiting-approval.html', 'payment.html', 'login.html'],
+  /** Pages allowed while payment is pending review or subscription expired */
+  PENDING_ALLOWED_PAGES: ['waiting-approval.html', 'payment.html', 'payment-success.html', 'login.html'],
 
-  /** Dashboard, community, etc. — only after admin approves payment */
+  /** Dashboard, community, etc. — only with an active monthly subscription */
   ACTIVE_ONLY_PAGES: ['dashboard.html', 'community.html'],
+
+  isSubscriptionActive(user) {
+    if (!user || user.role === 'admin') return true;
+    return user.status === 'active' && user.subscription_active !== false;
+  },
 
   currentPage() {
     const path = window.location.pathname.split('/').pop();
@@ -111,7 +116,7 @@ const Auth = {
   },
 
   onApproved(user) {
-    if (!user || user.status !== 'active') return false;
+    if (!user || !this.isSubscriptionActive(user)) return false;
     this.saveSession(localStorage.getItem('buxinev_token'), user);
     BuxinEV.showToast('Approved! Opening your dashboard…', 'success');
     window.location.replace('dashboard.html');
@@ -121,7 +126,7 @@ const Auth = {
   startApprovalWatcher() {
     const check = async () => {
       const user = await this.refreshUserFresh();
-      if (user?.status === 'active') this.onApproved(user);
+      if (user && this.isSubscriptionActive(user)) this.onApproved(user);
     };
 
     void check();
@@ -136,11 +141,11 @@ const Auth = {
     this._approvalSocket.on('notification', async (data) => {
       if (data?.user_status === 'active' || data?.status === 'active') {
         const user = await this.refreshUserFresh();
-        if (user) this.onApproved(user);
+        if (user && this.isSubscriptionActive(user)) this.onApproved(user);
         return;
       }
       const user = await this.refreshUserFresh();
-      if (user?.status === 'active') this.onApproved(user);
+      if (user && this.isSubscriptionActive(user)) this.onApproved(user);
     });
   },
 
@@ -156,23 +161,24 @@ const Auth = {
     try {
       const { payments } = await BuxinEV.api('/api/payments/my');
       const latest = payments?.[0];
-      if (latest?.receipt_url) return 'waiting-approval.html';
+      if (latest?.status === 'pending' && latest?.receipt_url) return 'waiting-approval.html';
     } catch {
       /* fall through */
     }
     const t = user.class_type === 'individual' ? 'individual' : 'group';
-    return `payment.html?type=${t}`;
+    const renew = user.status === 'expired' ? '&renew=1' : '';
+    return `payment.html?type=${t}${renew}`;
   },
 
   async studentDestination(user) {
     if (user.role === 'admin') return 'admin-dashboard.html';
-    if (user.status === 'active') return 'dashboard.html';
+    if (this.isSubscriptionActive(user)) return 'dashboard.html';
     return this.resolvePendingRedirect(user);
   },
 
   isSafeNextForUser(user, next) {
     if (!next) return null;
-    if (user.status === 'active') return next;
+    if (this.isSubscriptionActive(user)) return next;
     const path = next.split('?')[0];
     if (path === 'payment.html' || path === 'waiting-approval.html') return next;
     return null;
@@ -183,7 +189,7 @@ const Auth = {
       window.location.href = 'admin-dashboard.html';
       return;
     }
-    if (user.status === 'active') {
+    if (this.isSubscriptionActive(user)) {
       window.location.href = nextOverride || 'dashboard.html';
       return;
     }
@@ -203,8 +209,12 @@ const Auth = {
   /** Pending students may only complete payment or wait; active students use the app. */
   async canAccessPage(user, page) {
     if (!user || user.role === 'admin') return true;
-    if (user.status === 'active') {
+    if (this.isSubscriptionActive(user)) {
       return page !== 'waiting-approval.html';
+    }
+    if (user.status === 'expired') {
+      if (page === 'payment.html' || page === 'waiting-approval.html' || page === 'login.html') return true;
+      return false;
     }
     const dest = await this.resolvePendingRedirect(user);
     if (page === 'waiting-approval.html') return dest === 'waiting-approval.html';
@@ -233,10 +243,14 @@ const Auth = {
 
     await this.updateNavLinks(user);
 
-    if (user.status === 'active') {
+    if (this.isSubscriptionActive(user)) {
       if (page === 'waiting-approval.html') {
         window.location.href = 'dashboard.html';
       }
+      return;
+    }
+
+    if (user.status === 'expired' && page === 'payment.html') {
       return;
     }
 
@@ -254,7 +268,7 @@ const Auth = {
     if (!user) return;
     const home = user.role === 'admin'
       ? 'admin-dashboard.html'
-      : user.status === 'active'
+      : this.isSubscriptionActive(user)
         ? 'dashboard.html'
         : await this.studentDestination(user);
     document.querySelectorAll('a.logo').forEach((a) => {
@@ -286,8 +300,15 @@ const Auth = {
       window.location.href = 'admin-dashboard.html';
       return;
     }
-    if (user.status === 'active') {
+    if (this.isSubscriptionActive(user)) {
       await this.goToStudentHome(user);
+      return;
+    }
+    if (user.status === 'expired') {
+      const page = this.currentPage();
+      if (this.PUBLIC_PAGES.includes(page)) {
+        window.location.href = await this.resolvePendingRedirect(user);
+      }
       return;
     }
     if (!(await this.canAccessPage(user, page))) {
@@ -317,6 +338,9 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if (params.get('msg') === 'session') {
     BuxinEV.showToast('Your session expired — log in again.', 'info');
+  }
+  if (params.get('msg') === 'renew') {
+    BuxinEV.showToast('Your monthly subscription ended — renew payment to access classes.', 'info');
   }
   void Auth.guardPublicEntry().then(() => Auth.enforceStudentAccess());
 });

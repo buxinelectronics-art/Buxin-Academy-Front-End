@@ -560,7 +560,7 @@ const Payments = {
 
     if (!user) return;
 
-    if (user.status === 'active') {
+    if (Auth.isSubscriptionActive(user)) {
       return this.initPaymentHistory(user);
     }
 
@@ -604,12 +604,21 @@ const Payments = {
 
 
 
+    const isRenewal = user.status === 'expired' || new URLSearchParams(location.search).get('renew') === '1';
+    const title = document.getElementById('payment-page-title');
+    if (title) {
+      title.textContent = isRenewal ? 'Renew monthly subscription' : 'Complete payment';
+    }
+    const renewBanner = document.getElementById('payment-renewal-notice');
+    if (renewBanner) renewBanner.classList.toggle('hidden', !isRenewal);
+
     const intro = document.getElementById('payment-intro');
-
-    if (intro && BuxinEV.getCountryCode() === 'GM') {
-
-      intro.textContent = 'Pick one option below — wallet is instant; bank and transfer need a receipt.';
-
+    if (intro) {
+      if (isRenewal) {
+        intro.textContent = 'Your paid month has ended. Choose a payment method below. After admin approves your receipt, classes and community unlock again for one month.';
+      } else if (BuxinEV.getCountryCode() === 'GM') {
+        intro.textContent = 'Pick one option below — wallet is instant; bank and transfer need a receipt.';
+      }
     }
 
 

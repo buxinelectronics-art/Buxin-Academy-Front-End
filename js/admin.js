@@ -157,8 +157,9 @@ const Admin = {
       const fd = new FormData(e.target);
       const content = (fd.get('content') || '').trim();
       const img = fd.get('image');
-      if (!content && !img?.size) {
-        BuxinEV.showToast('Write a message or add a photo', 'error');
+      const hasVideo = this.parseYouTubeId(content);
+      if (!content && !img?.size && !hasVideo) {
+        BuxinEV.showToast('Write a message, paste a YouTube link, or add a photo', 'error');
         return;
       }
       try {
@@ -423,13 +424,47 @@ const Admin = {
     }
   },
 
+  parseYouTubeId(text) {
+    if (!text) return null;
+    const patterns = [
+      /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([\w-]{11})/i,
+      /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([\w-]{11})/i,
+      /(?:https?:\/\/)?(?:www\.)?youtube\.com\/shorts\/([\w-]{11})/i,
+      /(?:https?:\/\/)?(?:www\.)?youtube\.com\/live\/([\w-]{11})/i,
+      /(?:https?:\/\/)?youtu\.be\/([\w-]{11})/i,
+    ];
+    for (const re of patterns) {
+      const m = text.match(re);
+      if (m) return m[1];
+    }
+    return null;
+  },
+
+  renderVideoEmbed(videoId) {
+    if (!videoId) return '';
+    const id = this.escape(videoId);
+    return `<div class="post-video-wrap"><iframe src="https://www.youtube-nocookie.com/embed/${id}" title="YouTube video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>`;
+  },
+
+  renderAdminPostBody(p) {
+    const vid = p.youtube_video_id || this.parseYouTubeId(p.content);
+    const raw = (p.content || '').trim();
+    const isPlaceholder = raw === '📷' || raw === '🎬';
+    let html = '';
+    if (raw && !isPlaceholder) {
+      html += `<p class="post-content">${this.escape(raw)}</p>`;
+    }
+    if (vid) html += this.renderVideoEmbed(vid);
+    return html;
+  },
+
   renderAdminPost(p) {
     return `
       <article class="post-card glass mb-3" data-admin-post="${p.id}">
         <p><strong>${this.escape(p.author_name)}</strong> · <small>${BuxinEV.formatDate(p.created_at)}</small></p>
         ${p.is_pinned ? '<span class="pin-badge">📌 Pinned</span> ' : ''}
         ${p.is_announcement ? '<span class="announce-badge">📢</span> ' : ''}
-        <p class="post-content">${this.escape(p.content)}</p>
+        ${this.renderAdminPostBody(p)}
         ${p.image_url ? `<img src="${p.image_url}" alt="" class="post-image" loading="lazy">` : ''}
         <p class="text-sm opacity-70">❤️ ${p.like_count || 0} · 💬 ${p.comment_count || 0}</p>
         <div class="flex gap-2 mt-2 flex-wrap">

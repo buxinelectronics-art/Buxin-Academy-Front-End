@@ -11,7 +11,49 @@ const Community = {
   _lastLocalPostAt: 0,
 
   canUse(user) {
-    return user && (user.role === 'admin' || user.status === 'active');
+    return user && (user.role === 'admin' || Auth.isSubscriptionActive(user));
+  },
+
+  parseYouTubeId(text) {
+    if (!text) return null;
+    const patterns = [
+      /(?:https?:\/\/)?(?:www\.)?youtube\.com\/watch\?v=([\w-]{11})/i,
+      /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([\w-]{11})/i,
+      /(?:https?:\/\/)?(?:www\.)?youtube\.com\/shorts\/([\w-]{11})/i,
+      /(?:https?:\/\/)?(?:www\.)?youtube\.com\/live\/([\w-]{11})/i,
+      /(?:https?:\/\/)?youtu\.be\/([\w-]{11})/i,
+    ];
+    for (const re of patterns) {
+      const m = text.match(re);
+      if (m) return m[1];
+    }
+    return null;
+  },
+
+  renderVideoEmbed(videoId) {
+    if (!videoId) return '';
+    const id = this.escape(videoId);
+    return `<div class="post-video-wrap"><iframe src="https://www.youtube-nocookie.com/embed/${id}" title="YouTube video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe></div>`;
+  },
+
+  linkifyContent(text) {
+    const escaped = this.escape(text);
+    return escaped.replace(
+      /(https?:\/\/[^\s<]+)/gi,
+      (url) => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`
+    );
+  },
+
+  renderPostBody(p) {
+    const vid = p.youtube_video_id || this.parseYouTubeId(p.content);
+    const raw = (p.content || '').trim();
+    const isPlaceholder = raw === '📷' || raw === '🎬';
+    let html = '';
+    if (raw && !isPlaceholder) {
+      html += `<p class="post-content">${this.linkifyContent(raw)}</p>`;
+    }
+    if (vid) html += this.renderVideoEmbed(vid);
+    return html;
   },
 
   async init() {
@@ -53,7 +95,7 @@ const Community = {
       if (data?.id) document.querySelector(`[data-post-id="${data.id}"]`)?.remove();
     });
     this.socket.on('post_updated', (post) => {
-      if (post?.id) this.onSocketNewPost(post);
+      if (post?.id) this.replacePost(post);
     });
   },
 
@@ -81,6 +123,10 @@ const Community = {
       this.setImagePreview(file);
       this._compressedBlob = null;
       if (file) void this.prepareImageInBackground(file);
+    });
+
+    document.getElementById('post-content')?.addEventListener('input', (e) => {
+      this.setVideoPreview(this.parseYouTubeId(e.target.value));
     });
 
     const feed = document.getElementById('community-feed');
@@ -131,6 +177,20 @@ const Community = {
     }
   },
 
+  setVideoPreview(videoId) {
+    const el = document.getElementById('post-video-preview');
+    if (!el) return;
+    if (videoId) {
+      el.innerHTML = this.renderVideoEmbed(videoId);
+      el.classList.remove('hidden');
+      el.removeAttribute('aria-hidden');
+    } else {
+      el.innerHTML = '';
+      el.classList.add('hidden');
+      el.setAttribute('aria-hidden', 'true');
+    }
+  },
+
   setUploadStatus(text) {
     const el = document.getElementById('post-upload-status');
     if (!el) return;
@@ -171,12 +231,13 @@ const Community = {
     const imgInput = document.getElementById('post-image');
     if (imgInput) imgInput.value = '';
     this.setImagePreview(null);
+    this.setVideoPreview(null);
     this._compressedBlob = null;
     this.setUploadStatus('');
     form?.classList.remove('is-submitting');
   },
 
-  prependPendingPost({ pendingId, content, localImageUrl }) {
+  prependPendingPost({ pendingId, content, localImageUrl, youtubeId }) {
     const user = Auth.getUser();
     const feed = document.getElementById('community-feed');
     if (!feed) return;
@@ -188,7 +249,7 @@ const Community = {
           <div class="avatar-sm">${user?.full_name?.[0] || '?'}</div>
           <div><strong>${this.escape(user?.full_name || 'You')}</strong> <small>Just now</small></div>
         </header>
-        ${content ? `<p class="post-content">${this.escape(content)}</p>` : ''}
+        ${this.renderPostBody({ content, youtube_video_id: youtubeId })}
         ${localImageUrl ? `<img src="${localImageUrl}" alt="" class="post-image">` : ''}
       </article>`);
   },
@@ -206,8 +267,9 @@ const Community = {
     const contentEl = document.getElementById('post-content');
     const content = contentEl?.value.trim() || '';
     const file = document.getElementById('post-image')?.files?.[0];
-    if (!content && !file) {
-      BuxinEV.showToast('Write a message or add a photo', 'error');
+    const youtubeId = this.parseYouTubeId(content);
+    if (!content && !file && !youtubeId) {
+      BuxinEV.showToast('Write a message, paste a YouTube link, or add a photo', 'error');
       return;
     }
 
@@ -223,6 +285,7 @@ const Community = {
 
     if (!file) {
       contentEl.value = '';
+      this.setVideoPreview(null);
       this.releasePostForm(form, btn, prevLabel);
     }
 
@@ -236,7 +299,7 @@ const Community = {
           this._compressedBlob = blob;
         }
         localPreviewUrl = URL.createObjectURL(blob);
-        this.prependPendingPost({ pendingId, content, localImageUrl: localPreviewUrl });
+        this.prependPendingPost({ pendingId, content, localImageUrl: localPreviewUrl, youtubeId });
         this.setUploadStatus('Uploading…');
         if (btn) btn.textContent = 'Uploading…';
 
@@ -266,6 +329,20 @@ const Community = {
       if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
       this.releasePostForm(form, btn, prevLabel);
     }
+  },
+
+  replacePost(post) {
+    const user = Auth.getUser();
+    const html = this.renderPost(post, user);
+    const existing = document.querySelector(`[data-post-id="${post.id}"]`);
+    if (existing) {
+      existing.outerHTML = html;
+    } else {
+      this.prependPost(post);
+      return;
+    }
+    const cached = BuxinEV.cacheGet('community_posts') || [];
+    BuxinEV.cacheSet('community_posts', [post, ...cached.filter((p) => p.id !== post.id)]);
   },
 
   prependPost(post) {
@@ -346,7 +423,7 @@ const Community = {
             <small>${BuxinEV.formatDate(p.created_at)}</small>
           </div>
         </header>
-        ${p.content && p.content !== '📷' ? `<p class="post-content">${this.escape(p.content)}</p>` : ''}
+        ${this.renderPostBody(p)}
         ${p.image_url ? `<img src="${p.image_url}" alt="Post" class="post-image" loading="lazy">` : ''}
         ${p.meet_link || p.zoom_link ? `
           <div class="flex gap-2 mt-2 flex-wrap">
