@@ -38,6 +38,7 @@ const Auth = {
     localStorage.removeItem('buxinev_token');
     localStorage.removeItem('buxinev_user');
     sessionStorage.removeItem('buxinev_wake_ok');
+    sessionStorage.removeItem('buxinev_last_wake');
   },
 
   logout() {

@@ -389,30 +389,90 @@ const BuxinEV = {
   },
 
   _wakePromise: null,
+  _keepaliveTimer: null,
+  _keepaliveStarted: false,
 
-  /** Wake Render once per tab before API calls — cuts long waits on dashboard/community. */
+  /** How long we consider the backend "warm" after a successful ping. */
+  WAKE_MAX_AGE_MS: 8 * 60 * 1000,
+  /** Ping while the tab is open so Render free tier does not sleep (idle ~15 min). */
+  KEEPALIVE_INTERVAL_MS: 3 * 60 * 1000,
+
+  _getLastWakeAt() {
+    return parseInt(sessionStorage.getItem('buxinev_last_wake') || '0', 10) || 0;
+  },
+
+  _markWakeSuccess(dbOk) {
+    const now = Date.now();
+    sessionStorage.setItem('buxinev_last_wake', String(now));
+    if (dbOk) sessionStorage.setItem('buxinev_wake_ok', '1');
+  },
+
+  isBackendWarm() {
+    const last = this._getLastWakeAt();
+    return last > 0 && (Date.now() - last) < this.WAKE_MAX_AGE_MS;
+  },
+
+  /**
+   * Hit /api/wake (SELECT 1) — wakes Render and the database connection.
+   * aggressive: long retry loop for cold start on first visit.
+   */
+  async pingBackend({ aggressive = false } = {}) {
+    const url = `${this.API_URL.replace(/\/$/, '')}/api/wake`;
+    const fetchOnce = () => fetch(url, { method: 'GET', mode: 'cors', cache: 'no-store' });
+
+    try {
+      let res;
+      if (aggressive) {
+        res = await this.fetchWithColdStartRetry(url, { method: 'GET', cache: 'no-store' });
+      } else {
+        res = await fetchOnce();
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        this._markWakeSuccess(data.db === 1);
+        return data.db === 1;
+      }
+    } catch {
+      /* next api() call will retry */
+    }
+    return false;
+  },
+
+  /** Before API calls: ensure server was pinged recently (not a stale sessionStorage flag). */
   async ensureAwake() {
-    if (sessionStorage.getItem('buxinev_wake_ok')) return true;
+    if (this.isBackendWarm()) return true;
     if (!this._wakePromise) {
-      this._wakePromise = this.wakeBackendIfNeeded().finally(() => {
+      this._wakePromise = this.pingBackend({ aggressive: true }).finally(() => {
         this._wakePromise = null;
       });
     }
     await this._wakePromise;
-    return !!sessionStorage.getItem('buxinev_wake_ok');
+    return this.isBackendWarm();
   },
 
-  async wakeBackendIfNeeded() {
-    if (sessionStorage.getItem('buxinev_wake_ok')) return;
-    try {
-      const res = await this.fetchWithColdStartRetry(`${this.API_URL}/api/wake`, {
-        method: 'GET',
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.ok && data.db === 1) sessionStorage.setItem('buxinev_wake_ok', '1');
-    } catch {
-      /* api() still retries */
-    }
+  /**
+   * Start on every page: wake immediately + ping every few minutes while tab is visible.
+   */
+  startKeepalive() {
+    if (this._keepaliveStarted) return;
+    this._keepaliveStarted = true;
+
+    void this.pingBackend({ aggressive: !this.isBackendWarm() });
+
+    this._keepaliveTimer = setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
+      void this.pingBackend({ aggressive: false });
+    }, this.KEEPALIVE_INTERVAL_MS);
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && !this.isBackendWarm()) {
+        void this.pingBackend({ aggressive: true });
+      }
+    });
+  },
+
+  wakeBackendIfNeeded() {
+    return this.pingBackend({ aggressive: !this.isBackendWarm() });
   },
 
   cacheGet(key) {
@@ -436,6 +496,6 @@ const BuxinEV = {
 document.addEventListener('DOMContentLoaded', () => {
   BuxinEV.initTheme();
   BuxinEV.initNav();
-  void BuxinEV.wakeBackendIfNeeded();
+  BuxinEV.startKeepalive();
 });
 
