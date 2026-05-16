@@ -44,7 +44,7 @@
 
   .admin-tabs { overflow-x: auto; flex-wrap: nowrap; }
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
-  .payment-methods { grid-template-columns: 1fr 1fr; }
+  .payment-methods:not(.payment-methods--tiers) { grid-template-columns: 1fr 1fr; }
   .hero-cta .btn { width: 100%; }
 }
 

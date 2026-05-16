@@ -54,7 +54,8 @@
       <h2 class="text-sm mb-3" style="color:var(--primary)">Payment</h2>
       <p class="payment-amount" data-price-group style="font-size:1.75rem;margin-bottom:1rem">D362.50</p>
       <div id="payment-methods" class="payment-methods"></div>
-      <div id="manual-receipt-block">
+      <div id="payment-details-panel" class="payment-details-panel hidden"></div>
+      <div id="manual-receipt-block" class="hidden">
         <div class="form-group">
           <label>Upload payment receipt (bank / transfer only)</label>
           <input type="file" id="receipt-file" accept="image/*" capture="environment">
@@ -129,10 +130,11 @@
       const email = String(fd.get('email') || '').toLowerCase().trim();
       const btn = document.getElementById('submit-btn');
       const status = document.getElementById('form-status');
-      const method = document.querySelector('input[name=payment_method]:checked')?.value;
+      const method = Payments.getSelectedMethod()
+        || document.querySelector('input[name=payment_method]:checked')?.value;
       const receipt = receiptFile || document.getElementById('receipt-file').files?.[0];
 
-      if (!method) { BuxinEV.showToast('Select a payment method or use Wave / AfriMoney', 'error'); return; }
+      if (!method) { BuxinEV.showToast('Select bank transfer or money transfer above', 'error'); return; }
 
       submitting = true;
       btn.disabled = true;
@@ -155,10 +157,6 @@
             learning_goals: fd.get('learning_goals'),
             profile_picture_base64,
           });
-        }
-        if (BuxinModemPay.isInstantMethod(method)) {
-          await Payments.handleInstantPay('group', method);
-          return;
         }
         if (!receipt?.size) {
           BuxinEV.showToast('Upload your payment receipt', 'error');
