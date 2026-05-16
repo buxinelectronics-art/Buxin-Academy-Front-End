@@ -10,13 +10,17 @@ const Payments = {
     if (!token) throw { error: 'Please log in first.' };
     let res;
     try {
-      res = await fetch(`${BuxinEV.API_URL}/api/payments/submit`, {
+      res = await BuxinEV.fetchWithColdStartRetry(`${BuxinEV.API_URL}/api/payments/submit`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: form,
       });
     } catch {
-      throw { error: 'Cannot reach API. Wait and try again.', network: true };
+      throw {
+        error:
+          'Cannot reach API — try again in a minute if the server was sleeping (free hosting).',
+        network: true,
+      };
     }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw data;
@@ -37,13 +41,16 @@ const Payments = {
     if (!token) throw { error: 'Please log in first.' };
     let res;
     try {
-      res = await fetch(`${BuxinEV.API_URL}/api/payments/upload-receipt`, {
+      res = await BuxinEV.fetchWithColdStartRetry(`${BuxinEV.API_URL}/api/payments/upload-receipt`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
         body: form,
       });
     } catch {
-      throw { error: 'Upload failed — check connection and try again.', network: true };
+      throw {
+        error: 'Upload failed — server may be starting; wait and try again.',
+        network: true,
+      };
     }
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw data;

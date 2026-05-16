@@ -121,7 +121,31 @@ const BuxinEV = {
     });
   },
 
-  async api(endpoint, options = {}, retries = 1) {
+  /**
+   * Render free tier can take 30–90s to cold-start. Retry network errors and 502/503/504.
+   */
+  async fetchWithColdStartRetry(url, options = {}) {
+    const maxAttempts = 6;
+    const backoffMs = [3000, 5000, 8000, 12000, 15000];
+    let lastNetworkError = null;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      if (attempt > 0) {
+        await new Promise((r) => setTimeout(r, backoffMs[attempt - 1]));
+      }
+      try {
+        const res = await fetch(url, options);
+        if ([502, 503, 504].includes(res.status) && attempt < maxAttempts - 1) {
+          continue;
+        }
+        return res;
+      } catch (err) {
+        lastNetworkError = err;
+      }
+    }
+    throw lastNetworkError;
+  },
+
+  async api(endpoint, options = {}) {
     const token = localStorage.getItem('buxinev_token');
     const headers = { ...(options.headers || {}) };
     if (!(options.body instanceof FormData)) {
@@ -131,14 +155,14 @@ const BuxinEV = {
 
     let res;
     try {
-      res = await fetch(`${this.API_URL}${endpoint}`, { ...options, headers });
+      res = await this.fetchWithColdStartRetry(`${this.API_URL}${endpoint}`, {
+        ...options,
+        headers,
+      });
     } catch {
-      if (retries > 0) {
-        await new Promise((r) => setTimeout(r, 2000));
-        return this.api(endpoint, options, retries - 1);
-      }
       throw {
-        error: 'Cannot reach API. Wait 30s (server waking up) and try again.',
+        error:
+          'Cannot reach API — the server may still be starting (free hosting). Wait a minute and try again.',
         network: true,
       };
     }
