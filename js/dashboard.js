@@ -25,7 +25,7 @@ const Dashboard = {
 
 
 
-    void BuxinEV.ensureAwake();
+    BuxinEV._startWakeInBackground();
 
 
 
@@ -447,7 +447,7 @@ const WaitingPage = {
 
 
 
-    void BuxinEV.ensureAwake();
+    BuxinEV._startWakeInBackground();
 
     Auth.startApprovalWatcher();
 

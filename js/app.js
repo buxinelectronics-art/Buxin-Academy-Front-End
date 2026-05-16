@@ -235,7 +235,8 @@ const BuxinEV = {
     const token = localStorage.getItem('buxinev_token');
     const headers = {};
     if (token) headers.Authorization = `Bearer ${token}`;
-    if (token) await this.ensureAwake();
+    this._startWakeInBackground();
+    await this.ensureAwake(1500);
     let res;
     try {
       res = await this.fetchUploadWithRetry(`${this.API_URL}${endpoint}`, {
@@ -250,6 +251,7 @@ const BuxinEV = {
       };
     }
     const data = await res.json().catch(() => ({}));
+    if (res.ok) this._markWakeSuccess(true);
     if (!res.ok) throw { status: res.status, ...data };
     return data;
   },
@@ -320,7 +322,8 @@ const BuxinEV = {
     }
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    if (token) await this.ensureAwake();
+    this._startWakeInBackground();
+    await this.ensureAwake(1500);
 
     let res;
     try {
@@ -336,6 +339,7 @@ const BuxinEV = {
       };
     }
     const data = await res.json().catch(() => ({}));
+    if (res.ok) this._markWakeSuccess(true);
     if (!res.ok) throw { status: res.status, ...data };
     return data;
   },
@@ -438,15 +442,25 @@ const BuxinEV = {
     return false;
   },
 
-  /** Before API calls: ensure server was pinged recently (not a stale sessionStorage flag). */
-  async ensureAwake() {
+  /** Start wake in background — never blocks the UI for a full cold-start retry chain. */
+  _startWakeInBackground() {
+    if (this.isBackendWarm() || this._wakePromise) return;
+    this._wakePromise = this.pingBackend({ aggressive: true }).finally(() => {
+      this._wakePromise = null;
+    });
+  },
+
+  /**
+   * Brief wait for wake (max ~1.5s). API calls proceed either way so post #2 is not stuck.
+   */
+  async ensureAwake(maxWaitMs = 1500) {
     if (this.isBackendWarm()) return true;
-    if (!this._wakePromise) {
-      this._wakePromise = this.pingBackend({ aggressive: true }).finally(() => {
-        this._wakePromise = null;
-      });
-    }
-    await this._wakePromise;
+    this._startWakeInBackground();
+    if (!this._wakePromise || maxWaitMs <= 0) return this.isBackendWarm();
+    await Promise.race([
+      this._wakePromise,
+      new Promise((resolve) => setTimeout(resolve, maxWaitMs)),
+    ]);
     return this.isBackendWarm();
   },
 
@@ -457,7 +471,7 @@ const BuxinEV = {
     if (this._keepaliveStarted) return;
     this._keepaliveStarted = true;
 
-    void this.pingBackend({ aggressive: !this.isBackendWarm() });
+    this._startWakeInBackground();
 
     this._keepaliveTimer = setInterval(() => {
       if (document.visibilityState === 'hidden') return;
@@ -466,13 +480,14 @@ const BuxinEV = {
 
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && !this.isBackendWarm()) {
-        void this.pingBackend({ aggressive: true });
+        this._startWakeInBackground();
       }
     });
   },
 
   wakeBackendIfNeeded() {
-    return this.pingBackend({ aggressive: !this.isBackendWarm() });
+    this._startWakeInBackground();
+    return this.ensureAwake(1500);
   },
 
   cacheGet(key) {

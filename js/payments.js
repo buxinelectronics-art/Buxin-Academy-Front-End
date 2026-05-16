@@ -540,7 +540,7 @@ const Payments = {
     const cached = Auth.getUser();
     if (cached) await Auth.updateNavLinks(cached);
     BuxinEV.initStudentNav('payment');
-    void BuxinEV.ensureAwake();
+    BuxinEV._startWakeInBackground();
 
     if (!Auth.isLoggedIn()) {
 

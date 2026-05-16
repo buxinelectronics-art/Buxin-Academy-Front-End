@@ -1,9 +1,13 @@
 const Community = {
   socket: null,
   _posting: false,
+  _postingSince: 0,
   _previewUrl: null,
   _compressedBlob: null,
   _compressing: false,
+  _commenting: new Set(),
+  _liking: new Set(),
+  _lastLocalPostAt: 0,
 
   canUse(user) {
     return user && (user.role === 'admin' || user.status === 'active');
@@ -29,7 +33,7 @@ const Community = {
       feed.innerHTML = cachedPosts.map((p) => this.renderPost(p, Auth.getUser())).join('');
     }
 
-    void BuxinEV.ensureAwake();
+    BuxinEV._startWakeInBackground();
     this.bindEvents();
     await this.loadPosts();
     this.initSocket();
@@ -41,6 +45,7 @@ const Community = {
     this.socket.emit('join', { room: 'community' });
     this.socket.on('new_post', (payload) => {
       if (this._posting) return;
+      if (Date.now() - this._lastLocalPostAt < 4000) return;
       if (payload?.id && document.querySelector(`[data-post-id="${payload.id}"]`)) return;
       void this.loadPosts();
     });
@@ -168,9 +173,19 @@ const Community = {
     document.querySelector(`[data-pending-id="${pendingId}"]`)?.remove();
   },
 
+  _resetPostingIfStuck() {
+    if (this._posting && Date.now() - this._postingSince > 90000) {
+      this._posting = false;
+    }
+  },
+
   async submitPost(e) {
     e.preventDefault();
-    if (this._posting) return;
+    this._resetPostingIfStuck();
+    if (this._posting) {
+      BuxinEV.showToast('Still sending the last post — wait a moment', 'info');
+      return;
+    }
 
     const form = e.currentTarget;
     const contentEl = document.getElementById('post-content');
@@ -187,6 +202,7 @@ const Community = {
     let localPreviewUrl = null;
 
     this._posting = true;
+    this._postingSince = Date.now();
     if (btn) {
       btn.disabled = true;
       btn.textContent = file ? 'Preparing…' : 'Posting…';
@@ -197,13 +213,11 @@ const Community = {
       let result;
       if (file) {
         this.setUploadStatus('Preparing photo (smaller size for faster upload)…');
-        const wake = BuxinEV.ensureAwake();
         let blob = this._compressedBlob;
         if (!blob) {
           blob = await BuxinEV.compressImageToBlob(file);
           this._compressedBlob = blob;
         }
-        await wake;
         localPreviewUrl = URL.createObjectURL(blob);
         this.prependPendingPost({ pendingId, content, localImageUrl: localPreviewUrl });
         this.setUploadStatus('Uploading to server…');
@@ -223,7 +237,10 @@ const Community = {
 
       this.removePendingPost(pendingId);
       this.clearPostForm();
-      if (result?.post) this.prependPost(result.post);
+      if (result?.post) {
+        this._lastLocalPostAt = Date.now();
+        this.prependPost(result.post);
+      }
       BuxinEV.showToast('Post shared!', 'success');
     } catch (err) {
       this.removePendingPost(pendingId);
@@ -333,6 +350,10 @@ const Community = {
   },
 
   async toggleLike(postId, btn) {
+    const id = String(postId);
+    if (this._liking.has(id)) return;
+    this._liking.add(id);
+    if (btn) btn.disabled = true;
     try {
       const res = await BuxinEV.api(`/api/community/posts/${postId}/like`, { method: 'POST' });
       const countEl = document.querySelector(`[data-like-count="${postId}"]`);
@@ -340,10 +361,16 @@ const Community = {
       if (btn) btn.classList.toggle('liked', !!res.liked);
     } catch (err) {
       BuxinEV.showToast(err.error || 'Could not like', 'error');
+    } finally {
+      this._liking.delete(id);
+      if (btn) btn.disabled = false;
     }
   },
 
   async submitComment(postId) {
+    const id = String(postId);
+    if (this._commenting.has(id)) return;
+
     const input = document.querySelector(`[data-comment-input="${postId}"]`);
     const content = input?.value.trim();
     if (!content) {
@@ -352,8 +379,13 @@ const Community = {
       return;
     }
     const btn = document.querySelector(`[data-comment-btn="${postId}"]`);
-    if (btn?.disabled) return;
-    if (btn) btn.disabled = true;
+    const prevLabel = btn?.textContent;
+
+    this._commenting.add(id);
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '…';
+    }
 
     try {
       const { comment } = await BuxinEV.api(`/api/community/posts/${postId}/comment`, {
@@ -365,7 +397,11 @@ const Community = {
     } catch (err) {
       BuxinEV.showToast(err.error || 'Comment failed', 'error');
     } finally {
-      if (btn) btn.disabled = false;
+      this._commenting.delete(id);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = prevLabel || 'Post';
+      }
     }
   },
 
