@@ -11,10 +11,18 @@
   <nav class="navbar">
     <div class="container">
       <a href="home.html" class="logo">🤖 Buxin Academy</a>
-      <div class="nav-links"><a href="home.html">Home</a><a href="login.html">Login</a></div>
+      <div class="nav-links">
+        <a href="home.html" class="nav-guest-only">Home</a>
+        <a href="login.html" class="nav-guest-only">Login</a>
+        <a href="dashboard.html" class="nav-student-only hidden" data-student-home>My account</a>
+      </div>
       <button id="menu-toggle">☰</button>
     </div>
-    <div id="mobile-nav" class="container"><a href="home.html">Home</a><a href="login.html">Login</a></div>
+    <div id="mobile-nav" class="container">
+      <a href="home.html" class="nav-guest-only">Home</a>
+      <a href="login.html" class="nav-guest-only">Login</a>
+      <a href="dashboard.html" class="nav-student-only hidden" data-student-home>My account</a>
+    </div>
   </nav>
 
   <main class="container" style="padding:2rem 1rem;max-width:640px">

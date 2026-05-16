@@ -14,7 +14,8 @@
     <div class="container">
       <a href="home.html" class="logo">🤖 Buxin Academy</a>
       <div class="nav-links">
-        <a href="login.html">Login</a>
+        <a href="login.html" class="nav-guest-only">Login</a>
+        <a href="dashboard.html" class="nav-student-only hidden" data-student-home>My account</a>
       </div>
       <div class="nav-actions">
         <button id="theme-toggle" aria-label="Toggle theme">🌙</button>
@@ -22,7 +23,8 @@
       </div>
     </div>
     <div id="mobile-nav" class="container">
-      <a href="login.html">Login</a>
+      <a href="login.html" class="nav-guest-only">Login</a>
+      <a href="dashboard.html" class="nav-student-only hidden" data-student-home>My account</a>
     </div>
   </nav>
 
@@ -77,6 +79,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/auth.js"></script>
   <script>
     if (!localStorage.getItem('buxinev_country')) location.href = 'index.html';
     BuxinEV.updatePriceElements();

@@ -1,4 +1,18 @@
 const Auth = {
+  PUBLIC_PAGES: [
+    'index.html',
+    'home.html',
+    'login.html',
+    'register.html',
+    'group-class.html',
+    'individual-class.html',
+  ],
+
+  currentPage() {
+    const path = window.location.pathname.split('/').pop();
+    return path || 'index.html';
+  },
+
   isLoggedIn() {
     return !!localStorage.getItem('buxinev_token');
   },
@@ -82,19 +96,71 @@ const Auth = {
     }
   },
 
-  redirectByStatus(user) {
-    const next = new URLSearchParams(window.location.search).get('next');
+  async studentDestination(user) {
+    if (user.role === 'admin') return 'admin-dashboard.html';
+    if (user.status === 'active') return 'dashboard.html';
+    if (user.status === 'rejected') return 'waiting-approval.html';
+    try {
+      const { payments } = await BuxinEV.api('/api/payments/my');
+      const latest = payments?.[0];
+      if (latest?.receipt_url) return 'waiting-approval.html';
+    } catch {
+      /* use payment page fallback */
+    }
+    const t = user.class_type === 'individual' ? 'individual' : 'group';
+    return `payment.html?type=${t}`;
+  },
+
+  async goToStudentHome(user, nextOverride) {
     if (user.role === 'admin') {
       window.location.href = 'admin-dashboard.html';
-    } else if (user.status === 'active') {
+      return;
+    }
+    if (nextOverride) {
+      window.location.href = nextOverride;
+      return;
+    }
+    if (user.status === 'active') {
       window.location.href = 'dashboard.html';
-    } else if (next) {
-      window.location.href = next;
-    } else if (user.status === 'pending') {
-      const t = user.class_type === 'individual' ? 'individual' : 'group';
-      window.location.href = `payment.html?type=${t}`;
-    } else {
-      window.location.href = 'waiting-approval.html';
+      return;
+    }
+    window.location.href = await this.studentDestination(user);
+  },
+
+  redirectByStatus(user) {
+    const next = new URLSearchParams(window.location.search).get('next');
+    void this.goToStudentHome(user, next || null);
+  },
+
+  async updateNavLinks(user) {
+    if (!user) return;
+    const home = user.role === 'admin'
+      ? 'admin-dashboard.html'
+      : user.status === 'active'
+        ? 'dashboard.html'
+        : await this.studentDestination(user);
+    document.querySelectorAll('a.logo').forEach((a) => {
+      a.href = home;
+    });
+    document.querySelectorAll('[data-student-home]').forEach((a) => {
+      a.href = home;
+    });
+    document.querySelectorAll('.nav-guest-only').forEach((el) => {
+      el.classList.add('hidden');
+    });
+    document.querySelectorAll('.nav-student-only').forEach((el) => {
+      el.classList.remove('hidden');
+    });
+  },
+
+  /** Logged-in students/admins should not stay on marketing/login pages. */
+  async guardPublicEntry() {
+    if (!this.isLoggedIn()) return;
+    const user = await this.refreshUser();
+    if (!user) return;
+    await this.updateNavLinks(user);
+    if (this.PUBLIC_PAGES.includes(this.currentPage())) {
+      await this.goToStudentHome(user);
     }
   },
 
@@ -121,6 +187,11 @@ document.addEventListener('DOMContentLoaded', () => {
   if (params.get('msg') === 'session') {
     BuxinEV.showToast('Your session expired — log in again.', 'info');
   }
+  void Auth.guardPublicEntry().then(() => {
+    if (Auth.isLoggedIn() && !Auth.PUBLIC_PAGES.includes(Auth.currentPage())) {
+      void Auth.updateNavLinks(Auth.getUser());
+    }
+  });
 });
 
 document.getElementById('login-form')?.addEventListener('submit', async (e) => {
@@ -143,8 +214,10 @@ document.getElementById('login-form')?.addEventListener('submit', async (e) => {
   }
 });
 
-document.getElementById('logout-btn')?.addEventListener('click', (e) => {
-  e.preventDefault();
-  Auth.logout();
+document.querySelectorAll('#logout-btn, #logout-btn-side, [data-logout]').forEach((el) => {
+  el.addEventListener('click', (e) => {
+    e.preventDefault();
+    Auth.logout();
+  });
 });
 

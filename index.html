@@ -46,10 +46,20 @@
 
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/auth.js"></script>
   <script>
+    (async () => {
+      if (Auth.isLoggedIn()) {
+        const user = await Auth.refreshUser();
+        if (user) {
+          await Auth.goToStudentHome(user);
+          return;
+        }
+      }
     const saved = localStorage.getItem('buxinev_country');
     if (saved) {
       window.location.href = 'home.html';
+      return;
     }
     const select = document.getElementById('country-select');
     const flagDisplay = document.getElementById('flag-display');
@@ -69,6 +79,7 @@
     BuxinEV.setCountry(select.value);
     flagDisplay.textContent = BuxinEV.getCountry().flag;
     BuxinEV.updatePriceElements();
+    })();
   </script>
 </body>
 </html>
