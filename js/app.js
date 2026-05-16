@@ -435,8 +435,9 @@ const BuxinEV = {
       .catch(() => {});
   },
 
-  /** Full wake once (page load). Data requests themselves also hit the server — no duplicate wake per api(). */
+  /** DB check only when Render may be cold — not on every page click. */
   _wakeOnce() {
+    if (this._recentlyConnected()) return;
     const base = this.API_URL.replace(/\/$/, '');
     this._keepAlivePing();
     fetch(`${base}/api/wake`, { method: 'GET', mode: 'cors', cache: 'no-store' })
@@ -446,13 +447,13 @@ const BuxinEV = {
   },
 
   _startWakeInBackground() {
-    this._wakeOnce();
+    if (!this._recentlyConnected()) this._wakeOnce();
   },
 
   startKeepalive() {
     if (this._keepaliveStarted) return;
     this._keepaliveStarted = true;
-    this._wakeOnce();
+    if (!this._recentlyConnected()) this._wakeOnce();
     this._keepaliveTimer = setInterval(() => {
       if (document.visibilityState === 'hidden') return;
       this._keepAlivePing();

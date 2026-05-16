@@ -20,7 +20,13 @@ window.BUXIN_CONFIG = {
   if (!api || isLocal) return;
 
   const base = api.replace(/\/$/, '');
-  // Fire-and-forget only — never blocks page load or data requests.
+  const last = parseInt(sessionStorage.getItem('buxinev_last_wake') || '0', 10) || 0;
+  const warm = last > 0 && Date.now() - last < 5 * 60 * 1000;
+
+  // Not restarting Render — just a tiny HTTP request so it stays awake.
+  // If we already talked to Render in the last 5 min, skip (you are clicking between pages).
+  if (warm) return;
+
   fetch(`${base}/api/ping`, { method: 'GET', mode: 'cors', cache: 'no-store' }).catch(() => {});
   fetch(`${base}/api/wake`, { method: 'GET', mode: 'cors', cache: 'no-store' })
     .then((r) => r.json().catch(() => ({})))
