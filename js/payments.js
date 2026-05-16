@@ -539,6 +539,7 @@ const Payments = {
   async initPaymentPage() {
     const cached = Auth.getUser();
     if (cached) await Auth.updateNavLinks(cached);
+    BuxinEV.initStudentNav('payment');
     void BuxinEV.ensureAwake();
 
     if (!Auth.isLoggedIn()) {
@@ -560,11 +561,7 @@ const Payments = {
     if (!user) return;
 
     if (user.status === 'active') {
-
-      window.location.replace('dashboard.html');
-
-      return;
-
+      return this.initPaymentHistory(user);
     }
 
     const pendingDest = await Auth.resolvePendingRedirect(user);
@@ -729,13 +726,58 @@ const Payments = {
 
   },
 
+  async initPaymentHistory(user) {
+    document.getElementById('payment-checkout')?.classList.add('hidden');
+    document.getElementById('payment-amount')?.classList.add('hidden');
+    document.getElementById('class-type-label')?.classList.add('hidden');
+    const historyBlock = document.getElementById('payment-history');
+    historyBlock?.classList.remove('hidden');
+
+    const title = document.getElementById('payment-page-title');
+    if (title) title.textContent = 'Payment History';
+    const intro = document.getElementById('payment-intro');
+    if (intro) intro.textContent = 'All your payments for Buxin Academy.';
+
+    const list = document.getElementById('payment-history-list');
+    const cached = BuxinEV.cacheGet('payments');
+    if (cached?.length && list) {
+      list.innerHTML = this.renderHistoryList(cached);
+    }
+
+    try {
+      const { payments } = await this.getMyPayments();
+      BuxinEV.cacheSet('payments', payments);
+      if (list) {
+        list.innerHTML = payments.length
+          ? this.renderHistoryList(payments)
+          : '<p class="opacity-70">No payments yet.</p>';
+      }
+    } catch {
+      if (list && !list.innerHTML.trim()) {
+        list.innerHTML = '<p class="opacity-70">Could not load payments. Try again.</p>';
+      }
+    }
+  },
+
+  renderHistoryList(payments) {
+    return payments.map((p) => `
+      <div class="payment-history-item glass" style="padding:1rem;margin-bottom:0.75rem;border:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem">
+          <span class="status-badge status-${p.status}">${p.status}</span>
+          <small class="opacity-70">${BuxinEV.formatDate(p.created_at)}</small>
+        </div>
+        <p class="mt-2"><strong>${p.currency || ''} ${Number(p.amount_local || 0).toLocaleString()}</strong></p>
+        <p class="text-sm opacity-70">${p.payment_method || '—'} · ${p.class_type || '—'} class</p>
+        ${p.receipt_url ? `<a href="${p.receipt_url}" target="_blank" rel="noopener" class="text-sm">View receipt</a>` : ''}
+      </div>
+    `).join('');
+  },
+
 };
 
-
-
 document.addEventListener('DOMContentLoaded', () => {
-
-  if (document.getElementById('payment-form')) Payments.initPaymentPage();
-
+  if (document.getElementById('payment-form') || document.getElementById('payment-history')) {
+    Payments.initPaymentPage();
+  }
 });
 

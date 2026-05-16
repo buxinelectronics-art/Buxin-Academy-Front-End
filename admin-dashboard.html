@@ -23,6 +23,7 @@
       <button data-tab="panel-students">Students</button>
       <button data-tab="panel-classes">Classes</button>
       <button data-tab="panel-schedules">Schedules</button>
+      <button data-tab="panel-community">Community</button>
     </div>
 
     <section id="panel-payments">
@@ -84,6 +85,7 @@
     </section>
 
     <section id="panel-classes" class="hidden">
+      <div id="admin-classes-list" class="glass mb-4" style="padding:1rem"></div>
       <form id="create-class-form" class="glass" style="padding:1.5rem;max-width:500px">
         <h3 class="mb-3">Schedule Live Class</h3>
         <div class="form-group"><label>Title</label><input name="title" value="Sunday Robotics Class" required></div>
@@ -97,11 +99,29 @@
       <form id="announcement-form" class="glass mt-4" style="padding:1.5rem;max-width:500px">
         <h3 class="mb-3">Community Announcement</h3>
         <div class="form-group"><label>Title</label><input name="title"></div>
-        <div class="form-group"><label>Message</label><textarea name="message" rows="3" required></textarea></div>
+        <div class="form-group"><label>Message</label><textarea name="message" rows="3"></textarea></div>
+        <div class="form-group"><label>Photo (optional)</label><input type="file" name="image" accept="image/*"></div>
         <div class="form-group"><label>Meet Link</label><input name="meet_link"></div>
         <div class="form-group"><label>Zoom Link</label><input name="zoom_link"></div>
         <button type="submit" class="btn btn-secondary btn-block">Post to Community</button>
       </form>
+    </section>
+
+    <section id="panel-community" class="hidden">
+      <form id="admin-post-form" class="glass" style="padding:1.5rem;max-width:520px;margin-bottom:1.5rem">
+        <h3 class="mb-3">New community post</h3>
+        <div class="form-group"><label>Message</label><textarea name="content" rows="3" placeholder="Share an update…"></textarea></div>
+        <div class="form-group"><label>Photo (optional)</label><input type="file" name="image" accept="image/*"></div>
+        <div class="form-group"><label>Google Meet</label><input name="meet_link" placeholder="https://meet.google.com/..."></div>
+        <div class="form-group"><label>Zoom</label><input name="zoom_link" placeholder="https://zoom.us/..."></div>
+        <label class="text-sm"><input type="checkbox" name="is_pinned" checked> Pin to top</label>
+        <label class="text-sm" style="margin-left:1rem"><input type="checkbox" name="is_announcement"> Announcement</label>
+        <button type="submit" class="btn btn-primary btn-block mt-3">Publish</button>
+      </form>
+      <div class="glass" style="padding:1rem">
+        <h3 class="mb-3">All posts</h3>
+        <div id="admin-community-feed"></div>
+      </div>
     </section>
 
     <section id="panel-schedules" class="hidden">

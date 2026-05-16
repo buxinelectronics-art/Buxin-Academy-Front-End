@@ -7,35 +7,51 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/responsive.css">
 </head>
-<body>
-  <nav class="navbar"><div class="container"><a href="dashboard.html" class="logo">🤖 Buxin Academy</a></div></nav>
-  <main class="container" style="padding:2rem 1rem;max-width:560px">
-    <h1>Complete Payment</h1>
+<body data-page="payment">
+  <nav class="navbar student-navbar">
+    <div class="container navbar-inner">
+      <a href="dashboard.html" class="logo">?? Buxin Academy</a>
+      <div class="student-nav-wrap">
+        <button type="button" id="student-nav-toggle" class="btn btn-sm btn-secondary student-nav-toggle" aria-expanded="false" aria-controls="student-nav-menu">Menu</button>
+        <div id="student-nav-menu" class="student-nav-menu">
+          <a href="community.html" data-nav="community">Community</a>
+          <a href="payment.html" data-nav="payment">Payment</a>
+          <a href="#" id="student-nav-logout">Logout</a>
+        </div>
+      </div>
+    </div>
+  </nav>
+  <main class="container" style="padding:2rem 1rem;max-width:640px">
+    <h1 id="payment-page-title">Complete Payment</h1>
     <p id="class-type-label" class="opacity-70">Group Robotics Class</p>
-    <p class="payment-amount" id="payment-amount">—</p>
+    <p class="payment-amount" id="payment-amount">?</p>
     <p id="payment-intro" class="text-sm text-center opacity-70 mb-4">Choose how you want to pay</p>
 
-    <form id="payment-form" class="glass" style="padding:1.5rem">
-      <div id="payment-methods" class="payment-methods"></div>
-      <div id="payment-details-panel" class="payment-details-panel hidden"></div>
+    <section id="payment-history" class="hidden">
+      <div id="payment-history-list"></div>
+    </section>
 
-      <div id="manual-receipt-block" class="hidden">
-        <h3 class="mt-4 mb-2">Payment Instructions</h3>
-        <ol class="text-sm opacity-70" style="padding-left:1.2rem;margin-bottom:1rem">
-          <li>Send the exact amount shown above</li>
-          <li>Take a screenshot of your confirmation</li>
-          <li>Upload the receipt below</li>
-          <li>Wait for admin approval (usually 24 hours)</li>
-        </ol>
-
-        <div class="form-group">
-          <label>Upload Receipt (bank / transfer methods only)</label>
-          <input type="file" id="receipt-file" accept="image/*" capture="environment">
-          <img id="receipt-preview" class="hidden" alt="Receipt preview">
+    <section id="payment-checkout">
+      <form id="payment-form" class="glass" style="padding:1.5rem">
+        <div id="payment-methods" class="payment-methods"></div>
+        <div id="payment-details-panel" class="payment-details-panel hidden"></div>
+        <div id="manual-receipt-block" class="hidden">
+          <h3 class="mt-4 mb-2">Payment Instructions</h3>
+          <ol class="text-sm opacity-70" style="padding-left:1.2rem;margin-bottom:1rem">
+            <li>Send the exact amount shown above</li>
+            <li>Take a screenshot of your confirmation</li>
+            <li>Upload the receipt below</li>
+            <li>Wait for admin approval (usually 24 hours)</li>
+          </ol>
+          <div class="form-group">
+            <label>Upload Receipt (bank / transfer methods only)</label>
+            <input type="file" id="receipt-file" accept="image/*" capture="environment">
+            <img id="receipt-preview" class="hidden receipt-thumb mt-2" alt="Receipt preview">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Submit receipt for approval</button>
         </div>
-        <button type="submit" class="btn btn-primary btn-block">Submit receipt for approval</button>
-      </div>
-    </form>
+      </form>
+    </section>
   </main>
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>

@@ -9,12 +9,19 @@
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
 </head>
 <body data-page="dashboard">
-  <nav class="navbar">
-    <div class="container">
+  <nav class="navbar student-navbar">
+    <div class="container navbar-inner">
       <a href="dashboard.html" class="logo">🤖 Buxin Academy</a>
       <div class="nav-actions">
-        <button id="theme-toggle">🌙</button>
-        <a href="#" id="logout-btn" class="btn btn-sm btn-secondary">Logout</a>
+        <button id="theme-toggle" type="button" aria-label="Toggle theme">🌙</button>
+        <div class="student-nav-wrap">
+          <button type="button" id="student-nav-toggle" class="btn btn-sm btn-secondary student-nav-toggle" aria-expanded="false" aria-controls="student-nav-menu">Menu</button>
+          <div id="student-nav-menu" class="student-nav-menu">
+            <a href="community.html" data-nav="community">Community</a>
+            <a href="payment.html" data-nav="payment">Payment</a>
+            <a href="#" id="student-nav-logout">Logout</a>
+          </div>
+        </div>
       </div>
     </div>
   </nav>
@@ -24,7 +31,7 @@
       <img id="user-avatar" class="hidden" style="width:64px;height:64px;border-radius:50%;margin-bottom:1rem" alt="">
       <p><strong id="user-name">—</strong></p>
       <p class="text-sm opacity-70" id="user-email">—</p>
-      <ul class="sidebar-nav mt-3">
+      <ul class="sidebar-nav sidebar-nav--desktop mt-3">
         <li><a href="dashboard.html" class="active">Dashboard</a></li>
         <li><a href="community.html">Community</a></li>
         <li><a href="payment.html">Payment</a></li>
@@ -46,13 +53,15 @@
 
       <div class="glass" style="padding:1.25rem">
         <h3>Live Classes</h3>
+        <p class="text-sm opacity-70">Tap below to join your class directly.</p>
         <div id="class-links" class="mt-3"></div>
       </div>
 
       <div id="schedule-info" class="glass hidden" style="padding:1.25rem"></div>
 
       <div class="glass" style="padding:1.25rem">
-        <h3>Payment Status</h3>
+        <h3>Latest Payment</h3>
+        <p class="text-sm opacity-70 mb-2"><a href="payment.html">View full payment history →</a></p>
         <div id="payment-status-card" class="mt-2"></div>
       </div>
 

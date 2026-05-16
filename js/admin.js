@@ -19,6 +19,7 @@ const Admin = {
     await this.loadStats();
     await this.loadStudents();
     await this.loadPayments();
+    await this.loadAdminClasses();
     this.bindTabs();
     this.setupStudentModals();
     this.bindActions();
@@ -31,6 +32,8 @@ const Admin = {
         document.querySelectorAll('main.container > section[id^="panel-"]').forEach(p => p.classList.add('hidden'));
         tab.classList.add('active');
         document.getElementById(tab.dataset.tab)?.classList.remove('hidden');
+        if (tab.dataset.tab === 'panel-community') void this.loadCommunityPosts();
+        if (tab.dataset.tab === 'panel-classes') void this.loadAdminClasses();
       });
     });
   },
@@ -110,6 +113,7 @@ const Admin = {
         });
         BuxinEV.showToast('Class created!', 'success');
         e.target.reset();
+        await this.loadAdminClasses();
       } catch (err) {
         BuxinEV.showToast(err.error || 'Failed', 'error');
       }
@@ -119,21 +123,69 @@ const Admin = {
       e.preventDefault();
       const fd = new FormData(e.target);
       try {
-        await BuxinEV.api('/api/admin/announcements', {
-          method: 'POST',
-          body: JSON.stringify({ title: fd.get('title'), message: fd.get('message') }),
-        });
-        await BuxinEV.api('/api/community/announcements', {
-          method: 'POST',
-          body: JSON.stringify({
-            content: fd.get('message'),
-            meet_link: fd.get('meet_link'),
-            zoom_link: fd.get('zoom_link'),
-            is_pinned: true,
-          }),
-        });
+        const content = [fd.get('title'), fd.get('message')].filter(Boolean).join('\n\n');
+        const img = fd.get('image');
+        if (img?.size) {
+          const form = new FormData();
+          form.append('content', content);
+          form.append('image', img, img.name || 'photo.jpg');
+          form.append('is_pinned', 'true');
+          if (fd.get('meet_link')) form.append('meet_link', fd.get('meet_link'));
+          if (fd.get('zoom_link')) form.append('zoom_link', fd.get('zoom_link'));
+          await BuxinEV.apiMultipart('/api/community/announcements', form);
+        } else {
+          await BuxinEV.api('/api/community/announcements', {
+            method: 'POST',
+            body: JSON.stringify({
+              content,
+              meet_link: fd.get('meet_link') || undefined,
+              zoom_link: fd.get('zoom_link') || undefined,
+              is_pinned: true,
+            }),
+          });
+        }
         BuxinEV.showToast('Announcement sent!', 'success');
         e.target.reset();
+        await this.loadCommunityPosts();
+      } catch (err) {
+        BuxinEV.showToast(err.error || 'Failed', 'error');
+      }
+    });
+
+    document.getElementById('admin-post-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const content = (fd.get('content') || '').trim();
+      const img = fd.get('image');
+      if (!content && !img?.size) {
+        BuxinEV.showToast('Write a message or add a photo', 'error');
+        return;
+      }
+      try {
+        if (img?.size) {
+          const form = new FormData();
+          form.append('content', content);
+          form.append('image', img, img.name || 'photo.jpg');
+          if (fd.get('meet_link')) form.append('meet_link', fd.get('meet_link'));
+          if (fd.get('zoom_link')) form.append('zoom_link', fd.get('zoom_link'));
+          if (fd.get('is_pinned') === 'on') form.append('is_pinned', 'true');
+          if (fd.get('is_announcement') === 'on') form.append('is_announcement', 'true');
+          await BuxinEV.apiMultipart('/api/community/posts', form);
+        } else {
+          await BuxinEV.api('/api/community/posts', {
+            method: 'POST',
+            body: JSON.stringify({
+              content,
+              meet_link: fd.get('meet_link') || undefined,
+              zoom_link: fd.get('zoom_link') || undefined,
+              is_pinned: fd.get('is_pinned') === 'on',
+              is_announcement: fd.get('is_announcement') === 'on',
+            }),
+          });
+        }
+        BuxinEV.showToast('Post published!', 'success');
+        e.target.reset();
+        await this.loadCommunityPosts();
       } catch (err) {
         BuxinEV.showToast(err.error || 'Failed', 'error');
       }
@@ -330,6 +382,102 @@ const Admin = {
       await this.loadStudents();
     } catch (err) {
       BuxinEV.showToast(err.error || 'Failed', 'error');
+    }
+  },
+
+  escape(text) {
+    const d = document.createElement('div');
+    d.textContent = text ?? '';
+    return d.innerHTML;
+  },
+
+  async loadAdminClasses() {
+    const el = document.getElementById('admin-classes-list');
+    if (!el) return;
+    try {
+      const { classes } = await BuxinEV.api('/api/admin/classes');
+      el.innerHTML = classes.length
+        ? `<h4 class="mb-2">Scheduled classes</h4>${classes.map((c) => `
+          <div class="admin-class-row" style="padding:0.75rem 0;border-bottom:1px solid var(--border)">
+            <strong>${this.escape(c.title)}</strong>
+            ${c.is_live ? ' <span class="live-badge">● LIVE</span>' : ''}
+            <p class="text-sm opacity-70">${BuxinEV.formatDate(c.scheduled_at)} · ${c.class_type}</p>
+            ${c.meet_link ? `<a href="${c.meet_link}" target="_blank" rel="noopener" class="text-sm">Meet</a> ` : ''}
+            ${c.zoom_link ? `<a href="${c.zoom_link}" target="_blank" rel="noopener" class="text-sm">Zoom</a>` : ''}
+            <button type="button" class="btn btn-sm btn-danger mt-2" onclick="Admin.deleteClass(${c.id})">Delete</button>
+          </div>`).join('')}`
+        : '<p class="opacity-70">No classes yet. Create one below.</p>';
+    } catch {
+      el.innerHTML = '<p class="opacity-70">Could not load classes.</p>';
+    }
+  },
+
+  async deleteClass(id) {
+    if (!confirm('Delete this class?')) return;
+    try {
+      await BuxinEV.api(`/api/admin/classes/${id}`, { method: 'DELETE' });
+      BuxinEV.showToast('Class removed', 'success');
+      await this.loadAdminClasses();
+    } catch (err) {
+      BuxinEV.showToast(err.error || 'Delete failed', 'error');
+    }
+  },
+
+  renderAdminPost(p) {
+    return `
+      <article class="post-card glass mb-3" data-admin-post="${p.id}">
+        <p><strong>${this.escape(p.author_name)}</strong> · <small>${BuxinEV.formatDate(p.created_at)}</small></p>
+        ${p.is_pinned ? '<span class="pin-badge">📌 Pinned</span> ' : ''}
+        ${p.is_announcement ? '<span class="announce-badge">📢</span> ' : ''}
+        <p class="post-content">${this.escape(p.content)}</p>
+        ${p.image_url ? `<img src="${p.image_url}" alt="" class="post-image" loading="lazy">` : ''}
+        <p class="text-sm opacity-70">❤️ ${p.like_count || 0} · 💬 ${p.comment_count || 0}</p>
+        <div class="flex gap-2 mt-2 flex-wrap">
+          <button type="button" class="btn btn-sm btn-secondary" onclick="Admin.editPost(${p.id})">Edit</button>
+          <button type="button" class="btn btn-sm btn-danger" onclick="Admin.deletePost(${p.id})">Delete</button>
+        </div>
+      </article>`;
+  },
+
+  async loadCommunityPosts() {
+    const feed = document.getElementById('admin-community-feed');
+    if (!feed) return;
+    feed.innerHTML = '<p class="opacity-70">Loading…</p>';
+    try {
+      const { posts } = await BuxinEV.api('/api/community/posts');
+      feed.innerHTML = posts.length
+        ? posts.map((p) => this.renderAdminPost(p)).join('')
+        : '<p class="opacity-70">No posts yet.</p>';
+    } catch {
+      feed.innerHTML = '<p class="opacity-70">Could not load posts.</p>';
+    }
+  },
+
+  async deletePost(id) {
+    if (!confirm('Delete this post for everyone?')) return;
+    try {
+      await BuxinEV.api(`/api/community/posts/${id}`, { method: 'DELETE' });
+      document.querySelector(`[data-admin-post="${id}"]`)?.remove();
+      BuxinEV.showToast('Post deleted', 'success');
+    } catch (err) {
+      BuxinEV.showToast(err.error || 'Delete failed', 'error');
+    }
+  },
+
+  async editPost(id) {
+    const card = document.querySelector(`[data-admin-post="${id}"]`);
+    const current = card?.querySelector('.post-content')?.textContent || '';
+    const content = prompt('Edit post message:', current);
+    if (content === null) return;
+    try {
+      await BuxinEV.api(`/api/community/posts/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ content: content.trim() }),
+      });
+      BuxinEV.showToast('Post updated', 'success');
+      await this.loadCommunityPosts();
+    } catch (err) {
+      BuxinEV.showToast(err.error || 'Update failed', 'error');
     }
   },
 };

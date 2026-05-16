@@ -9,10 +9,17 @@
   <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" defer></script>
 </head>
 <body data-page="community">
-  <nav class="navbar">
-    <div class="container">
-      <a href="dashboard.html" class="logo">🤖 Community</a>
-      <a href="dashboard.html" class="btn btn-sm btn-secondary">Dashboard</a>
+  <nav class="navbar student-navbar">
+    <div class="container navbar-inner">
+      <a href="dashboard.html" class="logo">🤖 Buxin Academy</a>
+      <div class="student-nav-wrap">
+        <button type="button" id="student-nav-toggle" class="btn btn-sm btn-secondary student-nav-toggle" aria-expanded="false" aria-controls="student-nav-menu">Menu</button>
+        <div id="student-nav-menu" class="student-nav-menu">
+          <a href="community.html" data-nav="community">Community</a>
+          <a href="payment.html" data-nav="payment">Payment</a>
+          <a href="#" id="student-nav-logout">Logout</a>
+        </div>
+      </div>
     </div>
   </nav>
 
@@ -39,6 +46,3 @@
   <script src="js/community.js"></script>
 </body>
 </html>
-
-
-

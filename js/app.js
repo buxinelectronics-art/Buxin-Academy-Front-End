@@ -155,34 +155,67 @@ const BuxinEV = {
   },
 
   async compressImageFile(file) {
-    if (!file || !file.type.startsWith('image/')) return null;
-    if (file.size < 400000) {
-      return new Promise((resolve) => {
-        const r = new FileReader();
-        r.onload = () => resolve(r.result);
-        r.readAsDataURL(file);
-      });
+    if (!file) return null;
+    if (!this.isImageFile(file)) {
+      throw { error: 'Photo must be JPG, PNG, or WebP.' };
     }
-    return new Promise((resolve) => {
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxW = 800;
-        let w = img.width;
-        let h = img.height;
-        if (w > maxW) {
-          h = (h * maxW) / w;
-          w = maxW;
-        }
-        canvas.width = w;
-        canvas.height = h;
-        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-        URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL('image/jpeg', 0.75));
+    return this.compressReceiptFile(file);
+  },
+
+  async apiMultipart(endpoint, formData, method = 'POST') {
+    const token = localStorage.getItem('buxinev_token');
+    const headers = {};
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (token) await this.ensureAwake();
+    let res;
+    try {
+      res = await this.fetchWithColdStartRetry(`${this.API_URL}${endpoint}`, {
+        method,
+        headers,
+        body: formData,
+      });
+    } catch {
+      throw {
+        error: 'Cannot reach API — wait a moment and try again.',
+        network: true,
       };
-      img.onerror = () => resolve(null);
-      img.src = url;
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw { status: res.status, ...data };
+    return data;
+  },
+
+  initStudentNav(activePage) {
+    const toggle = document.getElementById('student-nav-toggle');
+    const menu = document.getElementById('student-nav-menu');
+    if (!toggle || !menu) return;
+
+    const close = () => {
+      menu.classList.remove('open');
+      toggle.setAttribute('aria-expanded', 'false');
+    };
+
+    toggle.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const open = menu.classList.toggle('open');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!menu.contains(e.target) && e.target !== toggle) close();
+    });
+
+    menu.querySelectorAll('a[data-nav]').forEach((a) => {
+      a.classList.toggle('active', a.dataset.nav === activePage);
+    });
+
+    menu.querySelector('#student-nav-logout')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      Auth.logout();
+    });
+    document.getElementById('logout-btn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      Auth.logout();
     });
   },
 

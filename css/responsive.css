@@ -4,6 +4,25 @@
   .nav-links { display: flex; }
   #menu-toggle { display: none; }
   #mobile-nav { display: none !important; }
+
+  .sidebar-nav--desktop { display: block !important; }
+
+  .student-nav-toggle { display: none; }
+  .student-nav-menu {
+    display: flex !important;
+    position: static;
+    flex-direction: row;
+    gap: 0.25rem;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    box-shadow: none;
+    background: transparent;
+  }
+  .student-nav-menu a {
+    padding: 0.4rem 0.75rem;
+    border-radius: var(--radius);
+  }
 }
 
 @media (max-width: 767px) {
@@ -16,8 +35,9 @@
     overflow-x: auto;
     padding: 1rem;
   }
-  .sidebar-nav { display: flex; gap: 0.5rem; }
-  .sidebar-nav li { margin: 0; white-space: nowrap; }
+  .sidebar-nav--desktop { display: none !important; }
+  .nav-actions { display: flex; align-items: center; gap: 0.5rem; }
+  .student-navbar .logout-btn-desktop { display: none; }
 
   /* Responsive tables */
   table thead { display: none; }

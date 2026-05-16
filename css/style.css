@@ -118,7 +118,39 @@ label { display: block; margin-bottom: 0.35rem; font-size: 0.9rem; color: var(--
   padding: 0.75rem 0;
 }
 [data-theme="light"] .navbar { background: rgba(255,255,255,0.95); }
-.navbar .container { display: flex; align-items: center; justify-content: space-between; }
+.navbar .container,
+.navbar .navbar-inner { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+
+.student-nav-wrap { position: relative; }
+.student-nav-toggle { min-width: 5rem; }
+.student-nav-menu {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 0.35rem);
+  min-width: 11rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  z-index: 200;
+  padding: 0.35rem 0;
+}
+.student-nav-menu.open { display: block; }
+.student-nav-menu a {
+  display: block;
+  padding: 0.65rem 1rem;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+.student-nav-menu a:hover,
+.student-nav-menu a.active { background: rgba(0, 212, 170, 0.12); color: var(--accent); }
+
+#post-form.is-submitting { opacity: 0.85; pointer-events: none; }
+#post-form.is-submitting [type=submit] { cursor: wait; }
+
+.comment-section .btn-primary { flex-shrink: 0; min-width: 4.5rem; }
 .logo {
   font-size: 1.25rem;
   font-weight: 800;
@@ -520,6 +552,10 @@ button.payment-method-card.instant-pay-btn:hover {
 .post-footer { display: flex; gap: 1rem; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid var(--border); }
 .like-btn { background: none; border: none; cursor: pointer; color: var(--text-muted); font-size: 0.95rem; }
 .like-btn.liked { color: #ef4444; }
+.admin-badge { font-size: 0.7rem; background: var(--accent); color: #fff; padding: 0.1rem 0.4rem; border-radius: 4px; margin-left: 0.25rem; }
+.class-join-actions .btn-block { width: 100%; text-align: center; margin-top: 0.5rem; }
+.comment-item { padding: 0.5rem 0; border-top: 1px solid var(--border); }
+.comment-item p { margin: 0.25rem 0 0; }
 .comment-section { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
 .comment-section .input { margin: 0; flex: 1; }
 .pin-badge, .announce-badge, .live-badge {
