@@ -87,10 +87,10 @@ const Auth = {
     return data.user;
   },
 
-  async refreshUser() {
+  async refreshUser({ allowStale = false } = {}) {
     try {
       const data = await BuxinEV.api('/api/auth/me');
-      localStorage.setItem('buxinev_user', JSON.stringify(data.user));
+      this.saveSession(localStorage.getItem('buxinev_token'), data.user);
       return data.user;
     } catch (err) {
       if (this.isAuthError(err)) {
@@ -98,8 +98,56 @@ const Auth = {
         window.location.href = 'login.html?msg=session';
         return null;
       }
-      return this.getUser();
+      if (allowStale) return this.getUser();
+      return null;
     }
+  },
+
+  /** Always fetch fresh status (approval, etc.) — never trust stale cache alone. */
+  async refreshUserFresh() {
+    await BuxinEV.ensureAwake();
+    return this.refreshUser({ allowStale: false });
+  },
+
+  onApproved(user) {
+    if (!user || user.status !== 'active') return false;
+    this.saveSession(localStorage.getItem('buxinev_token'), user);
+    BuxinEV.showToast('Approved! Opening your dashboard…', 'success');
+    window.location.replace('dashboard.html');
+    return true;
+  },
+
+  startApprovalWatcher() {
+    const check = async () => {
+      const user = await this.refreshUserFresh();
+      if (user?.status === 'active') this.onApproved(user);
+    };
+
+    void check();
+    this._approvalPoll = setInterval(check, 8000);
+
+    if (typeof io === 'undefined') return;
+    const cached = this.getUser();
+    if (!cached?.id) return;
+
+    this._approvalSocket = io(BuxinEV.API_URL, { transports: ['websocket', 'polling'] });
+    this._approvalSocket.emit('join_user', { user_id: cached.id });
+    this._approvalSocket.on('notification', async (data) => {
+      if (data?.user_status === 'active' || data?.status === 'active') {
+        const user = await this.refreshUserFresh();
+        if (user) this.onApproved(user);
+        return;
+      }
+      const user = await this.refreshUserFresh();
+      if (user?.status === 'active') this.onApproved(user);
+    });
+  },
+
+  stopApprovalWatcher() {
+    if (this._approvalPoll) clearInterval(this._approvalPoll);
+    this._approvalSocket?.disconnect();
+    this._approvalPoll = null;
+    this._approvalSocket = null;
   },
 
   async resolvePendingRedirect(user) {
@@ -170,7 +218,9 @@ const Auth = {
   async enforceStudentAccess() {
     if (!this.isLoggedIn()) return;
     const page = this.currentPage();
-    const user = await this.refreshUser();
+    const cached = this.getUser();
+    if (cached) await this.updateNavLinks(cached);
+    const user = await this.refreshUserFresh() || cached;
     if (!user) return;
 
     if (user.role === 'admin') {
@@ -223,7 +273,9 @@ const Auth = {
   /** Logged-in users should not stay on marketing/signup pages (except individual schedule step). */
   async guardPublicEntry() {
     if (!this.isLoggedIn()) return;
-    const user = await this.refreshUser();
+    const cached = this.getUser();
+    if (cached) await this.updateNavLinks(cached);
+    const user = await this.refreshUserFresh() || cached;
     if (!user) return;
     await this.updateNavLinks(user);
     const page = this.currentPage();

@@ -537,6 +537,9 @@ const Payments = {
 
 
   async initPaymentPage() {
+    const cached = Auth.getUser();
+    if (cached) await Auth.updateNavLinks(cached);
+    void BuxinEV.ensureAwake();
 
     if (!Auth.isLoggedIn()) {
 
@@ -552,7 +555,7 @@ const Payments = {
 
 
 
-    const user = await Auth.refreshUser();
+    const user = await Auth.refreshUserFresh() || cached;
 
     if (!user) return;
 

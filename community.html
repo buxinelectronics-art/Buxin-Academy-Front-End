@@ -21,8 +21,13 @@
     <p class="opacity-70 mb-4">Share projects, discuss ideas, grow together</p>
 
     <form id="post-form" class="glass" style="padding:1rem;margin-bottom:1.5rem">
-      <textarea id="post-content" class="input" rows="3" placeholder="Share your robotics project or question..."></textarea>
-      <button type="submit" class="btn btn-primary">Post</button>
+      <textarea id="post-content" class="input" rows="3" placeholder="Write a message…"></textarea>
+      <div class="form-group mt-2">
+        <label class="text-sm opacity-70">Photo (optional)</label>
+        <input type="file" id="post-image" accept="image/*" class="input">
+        <img id="post-image-preview" class="hidden post-image-preview mt-2" alt="Preview">
+      </div>
+      <button type="submit" class="btn btn-primary mt-2">Post</button>
     </form>
 
     <div id="community-feed"></div>

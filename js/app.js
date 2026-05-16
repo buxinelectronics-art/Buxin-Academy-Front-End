@@ -218,6 +218,8 @@ const BuxinEV = {
     }
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
+    if (token) await this.ensureAwake();
+
     let res;
     try {
       res = await this.fetchWithColdStartRetry(`${this.API_URL}${endpoint}`, {
@@ -284,10 +286,20 @@ const BuxinEV = {
     this.updatePriceElements();
   },
 
-  /**
-   * Free hosts (e.g. Render) sleep until traffic hits the API. Static site open ≠ API traffic.
-   * Ping once per tab so opening the site starts wake + confirms DB (`db: 1` from SELECT 1).
-   */
+  _wakePromise: null,
+
+  /** Wake Render once per tab before API calls — cuts long waits on dashboard/community. */
+  async ensureAwake() {
+    if (sessionStorage.getItem('buxinev_wake_ok')) return true;
+    if (!this._wakePromise) {
+      this._wakePromise = this.wakeBackendIfNeeded().finally(() => {
+        this._wakePromise = null;
+      });
+    }
+    await this._wakePromise;
+    return !!sessionStorage.getItem('buxinev_wake_ok');
+  },
+
   async wakeBackendIfNeeded() {
     if (sessionStorage.getItem('buxinev_wake_ok')) return;
     try {
@@ -297,7 +309,24 @@ const BuxinEV = {
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.db === 1) sessionStorage.setItem('buxinev_wake_ok', '1');
     } catch {
-      /* Login and other actions still use api() retries */
+      /* api() still retries */
+    }
+  },
+
+  cacheGet(key) {
+    try {
+      const raw = sessionStorage.getItem(`buxinev_cache_${key}`);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  },
+
+  cacheSet(key, value) {
+    try {
+      sessionStorage.setItem(`buxinev_cache_${key}`, JSON.stringify(value));
+    } catch {
+      /* quota */
     }
   },
 };
