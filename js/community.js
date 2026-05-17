@@ -82,8 +82,8 @@ const Community = {
     }
 
     this.bindEvents();
-    this.initSocket();
     void this.loadPosts({ silent: BuxinEV.cacheFresh('community_posts') });
+    setTimeout(() => this.initSocket(), 800);
   },
 
   initSocket() {
@@ -458,13 +458,25 @@ const Community = {
     const id = String(postId);
     if (this._liking.has(id)) return;
     this._liking.add(id);
-    if (btn) btn.disabled = true;
+
+    const countEl = document.querySelector(`[data-like-count="${postId}"]`);
+    const wasLiked = btn?.classList.contains('liked');
+    const prevCount = parseInt(countEl?.textContent || '0', 10) || 0;
+    if (btn) {
+      btn.classList.toggle('liked', !wasLiked);
+      btn.disabled = true;
+    }
+    if (countEl) {
+      countEl.textContent = String(Math.max(0, prevCount + (wasLiked ? -1 : 1)));
+    }
+
     try {
       const res = await BuxinEV.api(`/api/community/posts/${postId}/like`, { method: 'POST' });
-      const countEl = document.querySelector(`[data-like-count="${postId}"]`);
       if (countEl) countEl.textContent = String(res.like_count ?? 0);
       if (btn) btn.classList.toggle('liked', !!res.liked);
     } catch (err) {
+      if (btn) btn.classList.toggle('liked', wasLiked);
+      if (countEl) countEl.textContent = String(prevCount);
       BuxinEV.showToast(err.error || 'Could not like', 'error');
     } finally {
       this._liking.delete(id);

@@ -27,7 +27,7 @@ const Dashboard = {
         window.location.href = 'admin-dashboard.html';
         return;
       }
-      if (!Auth.isSubscriptionActive(fresh)) {
+      if (!Auth.hasPaidAccess(fresh)) {
         window.location.replace(await Auth.resolvePendingRedirect(fresh));
         return;
       }
@@ -36,7 +36,7 @@ const Dashboard = {
         document.getElementById('schedule-info')?.classList.remove('hidden');
       }
       void this.refreshAllSections(fresh, { useCache: false });
-      this.initSocket(fresh.id);
+      setTimeout(() => this.initSocket(fresh.id), 800);
       this.startCountdown();
       return;
     }
@@ -46,9 +46,9 @@ const Dashboard = {
       return;
     }
 
-    if (!Auth.isSubscriptionActive(user)) {
+    if (!Auth.hasPaidAccess(user)) {
       void Auth.refreshUserFresh().then((fresh) => {
-        if (fresh && !Auth.isSubscriptionActive(fresh)) {
+        if (fresh && !Auth.hasPaidAccess(fresh)) {
           void Auth.resolvePendingRedirect(fresh).then((dest) => { window.location.replace(dest); });
         }
       });
@@ -65,7 +65,7 @@ const Dashboard = {
 
 
 
-    this.initSocket(user.id);
+    setTimeout(() => this.initSocket(user.id), 800);
     this.startCountdown();
   },
 
@@ -167,9 +167,7 @@ const Dashboard = {
 
     }
 
-    const country = BuxinEV.COUNTRIES[user.country_code];
-
-    set('user-country', country ? `${country.flag} ${country.name}` : user.country_code);
+    set('user-country', BuxinEV.formatUserCountry(user));
 
     this.renderSubscription(user);
 
@@ -177,8 +175,37 @@ const Dashboard = {
 
   renderSubscription(user) {
     const card = document.getElementById('subscription-card');
-    if (!card || !Auth.isSubscriptionActive(user)) {
+    if (!card || !Auth.hasPaidAccess(user)) {
       card?.classList.add('hidden');
+      return;
+    }
+
+    card.classList.remove('hidden');
+    const progressWrap = card.querySelector('.subscription-progress');
+    const awaitingEl = document.getElementById('subscription-awaiting-msg');
+    const renew = document.getElementById('subscription-renew-link');
+
+    if (user.awaiting_class_start) {
+      card.classList.remove('subscription-card--warning');
+      const dayLabel = document.getElementById('subscription-day-label');
+      if (dayLabel) dayLabel.textContent = 'Class period not started yet';
+      if (progressWrap) progressWrap.classList.add('hidden');
+      if (awaitingEl) {
+        awaitingEl.textContent = 'You are registered and paid. Day 1 of 30 will begin when your instructor starts the class. Community and the progress bar unlock then.';
+        awaitingEl.classList.remove('hidden');
+      }
+      const detail = document.getElementById('subscription-status');
+      if (detail) detail.textContent = 'Thank you for joining — sit tight until classes officially begin.';
+      document.getElementById('subscription-expiry-warning')?.classList.add('hidden');
+      renew?.classList.add('hidden');
+      return;
+    }
+
+    if (awaitingEl) awaitingEl.classList.add('hidden');
+    if (progressWrap) progressWrap.classList.remove('hidden');
+
+    if (!Auth.isSubscriptionActive(user)) {
+      card.classList.add('hidden');
       return;
     }
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,6 +11,19 @@
   <nav class="navbar"><div class="container"><span class="logo">🔐 Admin Dashboard</span><a href="#" id="logout-btn" class="btn btn-sm btn-secondary">Logout</a></div></nav>
 
   <main class="container" style="padding:1.5rem 1rem">
+    <section id="class-period-panel" class="glass class-period-panel mb-4" style="padding:1.25rem">
+      <div class="class-period-panel__row">
+        <div>
+          <h2 class="class-period-panel__title">30-day class period</h2>
+          <p id="class-period-status-text" class="text-sm opacity-80">Loading…</p>
+          <p id="class-period-waiting-text" class="text-sm opacity-70 hidden"></p>
+        </div>
+        <button type="button" id="start-class-period-btn" class="btn btn-primary btn-lg">
+          Start Day 1 for all classes
+        </button>
+      </div>
+    </section>
+
     <div class="stat-grid mb-4">
       <div class="stat-card glass"><p class="num" id="stat-total-students">0</p><p class="text-sm">Students</p></div>
       <div class="stat-card glass"><p class="num" id="stat-active-students">0</p><p class="text-sm">Active</p></div>

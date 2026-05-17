@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -91,7 +91,7 @@
         const payload = {
           full_name: fd.get('full_name'), email, phone: fd.get('phone'),
           city: fd.get('city'), password: fd.get('password'),
-          country_code: BuxinEV.getCountryCode(), class_type: 'group',
+          ...BuxinEV.getRegistrationCountry(), class_type: 'group',
           experience_level: fd.get('experience_level'),
           learning_goals: fd.get('learning_goals'),
           profile_picture_base64,
@@ -152,7 +152,7 @@
           await Auth.register({
             full_name: fd.get('full_name'), email, phone: fd.get('phone'),
             city: fd.get('city'), password: fd.get('password'),
-            country_code: BuxinEV.getCountryCode(), class_type: 'group',
+            ...BuxinEV.getRegistrationCountry(), class_type: 'group',
             experience_level: fd.get('experience_level'),
             learning_goals: fd.get('learning_goals'),
             profile_picture_base64,

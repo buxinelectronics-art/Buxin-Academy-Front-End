@@ -1,88 +1,265 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+
+<html lang="en" data-theme="light">
+
 <head>
+
   <meta charset="UTF-8">
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
   <meta name="description" content="Buxin Academy — Robotics education for African students">
+
   <title>Select Country | Buxin Academy</title>
+
   <script src="https://cdn.tailwindcss.com"></script>
+
   <link rel="stylesheet" href="css/style.css">
+
   <link rel="stylesheet" href="css/responsive.css">
+
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+
   <script src="js/config.js"></script>
+
 </head>
+
 <body>
+
   <main class="country-gate">
+
     <div class="country-card glass">
+
       <p class="hero-badge">🌍 Pan-African Robotics</p>
+
       <h1>Welcome to Buxin Academy</h1>
+
       <p class="opacity-70">Select your country to see prices in your local currency and available payment methods.</p>
 
+
+
       <div class="country-select-wrap">
+
         <span class="country-flag-display" id="flag-display">🇬🇲</span>
+
         <select id="country-select" class="country-select input" aria-label="Select country">
+
           <option value="GM">🇬🇲 The Gambia</option>
+
           <option value="NG">🇳🇬 Nigeria</option>
+
           <option value="SN">🇸🇳 Senegal</option>
+
           <option value="GH">🇬🇭 Ghana</option>
+
           <option value="KE">🇰🇪 Kenya</option>
+
           <option value="UG">🇺🇬 Uganda</option>
+
           <option value="TZ">🇹🇿 Tanzania</option>
+
           <option value="SL">🇸🇱 Sierra Leone</option>
+
           <option value="GN">🇬🇳 Guinea</option>
+
           <option value="CI">🇨🇮 Côte d'Ivoire</option>
+
           <option value="ZA">🇿🇦 South Africa</option>
+
+          <option value="OTHER">🌍 Other country (not listed)</option>
+
         </select>
+
       </div>
+
+
+
+      <div id="other-country-wrap" class="country-other-wrap hidden" style="margin:1rem 0;text-align:left">
+
+        <label for="other-country-input" class="text-sm font-medium">Your country</label>
+
+        <input type="text" id="other-country-input" class="input" style="margin-top:0.5rem"
+
+          placeholder="e.g. Rwanda, United States, France…" maxlength="80" autocomplete="country-name">
+
+        <p class="text-sm opacity-70 mt-2">Prices and payments for your region are in <strong>US dollars (USD)</strong>.</p>
+
+      </div>
+
+
 
       <div class="glass" style="padding:1rem;margin:1rem 0;text-align:left">
+
         <p class="text-sm opacity-70">Preview prices:</p>
+
         <p>Group Class: <strong data-price-group>D362.50</strong></p>
+
         <p>Individual: <strong data-price-individual>D7,250.00</strong></p>
+
       </div>
 
+
+
       <button id="continue-btn" class="btn btn-primary btn-lg btn-block">Continue →</button>
+
     </div>
+
   </main>
 
+
+
   <script src="js/config.js"></script>
+
   <script src="js/app.js"></script>
+
   <script src="js/auth.js"></script>
+
   <script>
+
     (async () => {
+
       if (Auth.isLoggedIn()) {
+
         const user = await Auth.refreshUser();
+
         if (user) {
+
           await Auth.goToStudentHome(user);
+
           return;
+
         }
+
       }
-    const saved = localStorage.getItem('buxinev_country');
-    if (saved) {
-      window.location.href = 'home.html';
-      return;
-    }
-    const select = document.getElementById('country-select');
-    const flagDisplay = document.getElementById('flag-display');
-    if (saved) select.value = saved;
 
-    select.addEventListener('change', () => {
-      BuxinEV.setCountry(select.value);
-      flagDisplay.textContent = BuxinEV.getCountry().flag;
-      BuxinEV.updatePriceElements();
-    });
 
-    document.getElementById('continue-btn').addEventListener('click', () => {
-      BuxinEV.setCountry(select.value);
-      window.location.href = 'home.html';
-    });
 
-    BuxinEV.setCountry(select.value);
-    flagDisplay.textContent = BuxinEV.getCountry().flag;
-    BuxinEV.updatePriceElements();
+      const saved = localStorage.getItem('buxinev_country');
+
+      if (saved && (!BuxinEV.isOtherCountry(saved) || (localStorage.getItem('buxinev_country_name') || '').trim())) {
+
+        window.location.href = 'home.html';
+
+        return;
+
+      }
+
+
+
+      const select = document.getElementById('country-select');
+
+      const flagDisplay = document.getElementById('flag-display');
+
+      const otherWrap = document.getElementById('other-country-wrap');
+
+      const otherInput = document.getElementById('other-country-input');
+
+
+
+      function syncOtherVisibility() {
+
+        const isOther = select.value === 'OTHER';
+
+        otherWrap.classList.toggle('hidden', !isOther);
+
+        if (isOther) otherInput.focus();
+
+      }
+
+
+
+      function applySelection() {
+
+        if (select.value === 'OTHER') {
+
+          BuxinEV.setCountry('OTHER', otherInput.value.trim());
+
+        } else {
+
+          BuxinEV.setCountry(select.value);
+
+        }
+
+        flagDisplay.textContent = BuxinEV.getCountry().flag;
+
+        BuxinEV.updatePriceElements();
+
+      }
+
+
+
+      if (saved) {
+
+        select.value = saved;
+
+        if (BuxinEV.isOtherCountry(saved)) {
+
+          otherInput.value = localStorage.getItem('buxinev_country_name') || '';
+
+        }
+
+      }
+
+
+
+      select.addEventListener('change', () => {
+
+        syncOtherVisibility();
+
+        applySelection();
+
+      });
+
+
+
+      otherInput.addEventListener('input', () => {
+
+        if (select.value === 'OTHER') applySelection();
+
+      });
+
+
+
+      document.getElementById('continue-btn').addEventListener('click', () => {
+
+        if (select.value === 'OTHER') {
+
+          const name = otherInput.value.trim();
+
+          if (name.length < 2) {
+
+            BuxinEV.showToast('Please type your country name', 'error');
+
+            otherInput.focus();
+
+            return;
+
+          }
+
+          BuxinEV.setCountry('OTHER', name);
+
+        } else {
+
+          BuxinEV.setCountry(select.value);
+
+        }
+
+        window.location.href = 'home.html';
+
+      });
+
+
+
+      syncOtherVisibility();
+
+      applySelection();
+
     })();
+
   </script>
+
 </body>
+
 </html>
 
 

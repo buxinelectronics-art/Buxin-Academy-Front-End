@@ -27,23 +27,53 @@ const BuxinEV = {
       payment_methods: ['Orange Money', 'MTN MoMo', 'Wave', 'Bank Transfer'] },
     ZA: { name: 'South Africa', flag: '🇿🇦', currency: 'ZAR', symbol: 'R', rate: 18.5,
       payment_methods: ['EFT', 'SnapScan', 'Visa', 'Mastercard', 'Bank Transfer'] },
+    OTHER: { name: 'Other country', flag: '🌍', currency: 'USD', symbol: '$', rate: 1,
+      payment_methods: ['Bank Transfer', 'Visa', 'Mastercard', 'Western Union / MoneyGram / Ria'] },
   },
 
   GROUP_PRICE_USD: 5,
   INDIVIDUAL_PRICE_USD: 100,
 
+  isOtherCountry(code = null) {
+    return (code || this.getCountryCode()).toUpperCase() === 'OTHER';
+  },
+
   getCountry() {
-    const code = localStorage.getItem('buxinev_country') || 'GM';
+    const code = this.getCountryCode();
+    if (this.isOtherCountry(code)) {
+      const name = (localStorage.getItem('buxinev_country_name') || '').trim() || 'Other country';
+      return { ...this.COUNTRIES.OTHER, name };
+    }
     return this.COUNTRIES[code] || this.COUNTRIES.GM;
   },
 
   getCountryCode() {
-    return localStorage.getItem('buxinev_country') || 'GM';
+    return (localStorage.getItem('buxinev_country') || 'GM').toUpperCase();
   },
 
-  setCountry(code) {
-    localStorage.setItem('buxinev_country', code);
-    const c = this.COUNTRIES[code];
+  getCountryName() {
+    return this.getCountry().name;
+  },
+
+  getRegistrationCountry() {
+    const payload = { country_code: this.getCountryCode() };
+    if (this.isOtherCountry()) {
+      payload.country_name = (localStorage.getItem('buxinev_country_name') || '').trim();
+    }
+    return payload;
+  },
+
+  setCountry(code, customName = null) {
+    const upper = String(code || 'GM').toUpperCase();
+    localStorage.setItem('buxinev_country', upper);
+    if (this.isOtherCountry(upper)) {
+      const name = String(customName ?? localStorage.getItem('buxinev_country_name') ?? '').trim();
+      if (name) localStorage.setItem('buxinev_country_name', name);
+      localStorage.setItem('buxinev_currency', 'USD');
+      localStorage.setItem('buxinev_symbol', '$');
+      return;
+    }
+    const c = this.COUNTRIES[upper];
     if (c) {
       localStorage.setItem('buxinev_country_name', c.name);
       localStorage.setItem('buxinev_currency', c.currency);
@@ -51,8 +81,31 @@ const BuxinEV = {
     }
   },
 
+  syncCountryFromUser(user) {
+    if (!user?.country_code) return;
+    if (this.isOtherCountry(user.country_code)) {
+      this.setCountry('OTHER', user.country_name || '');
+    } else {
+      this.setCountry(user.country_code);
+    }
+  },
+
+  formatUserCountry(user) {
+    if (!user) return '—';
+    if (this.isOtherCountry(user.country_code)) {
+      const name = (user.country_name || '').trim();
+      return name ? `🌍 ${name}` : '🌍 Other country';
+    }
+    const c = this.COUNTRIES[user.country_code];
+    return c ? `${c.flag} ${c.name}` : user.country_code;
+  },
+
   convertPrice(usd) {
     const c = this.getCountry();
+    if (c.currency === 'USD') {
+      const formatted = `$${Number(usd).toFixed(2)}`;
+      return { usd, local: usd, formatted, currency: 'USD', symbol: '$' };
+    }
     const local = usd * c.rate;
     const sym = c.symbol;
     const formatted = local >= 1000
@@ -62,7 +115,12 @@ const BuxinEV = {
   },
 
   requireCountry(redirect = 'index.html') {
-    if (!localStorage.getItem('buxinev_country')) {
+    const code = localStorage.getItem('buxinev_country');
+    if (!code) {
+      window.location.href = redirect;
+      return false;
+    }
+    if (this.isOtherCountry(code) && !(localStorage.getItem('buxinev_country_name') || '').trim()) {
       window.location.href = redirect;
       return false;
     }
@@ -70,7 +128,7 @@ const BuxinEV = {
   },
 
   getTheme() {
-    return localStorage.getItem('buxinev_theme') || 'dark';
+    return localStorage.getItem('buxinev_theme') || 'light';
   },
 
   setTheme(theme) {
@@ -295,12 +353,14 @@ const BuxinEV = {
     return last > 0 && Date.now() - last < this.WARM_CONNECTION_MS;
   },
 
-  /** Warm = server answered recently (e.g. you were just on Community). Cold = allow up to 90s once for Render boot. */
+  _inflightGets: new Map(),
+
+  /** Warm = fast fail + cache. Cold = one long wait for Render boot (no retry chain). */
   _fetchPolicy(isWrite = false) {
     if (this._recentlyConnected()) {
-      return { maxAttempts: isWrite ? 2 : 1, timeoutMs: isWrite ? 20000 : 15000 };
+      return { maxAttempts: isWrite ? 2 : 1, timeoutMs: isWrite ? 15000 : 12000 };
     }
-    return { maxAttempts: 1, timeoutMs: 90000 };
+    return { maxAttempts: 1, timeoutMs: 75000 };
   },
 
   async fetchWithRetry(url, options = {}, policy = {}) {
@@ -336,6 +396,20 @@ const BuxinEV = {
   },
 
   async api(endpoint, options = {}) {
+    const method = (options.method || 'GET').toUpperCase();
+    const dedupeKey = method === 'GET' ? endpoint : null;
+    if (dedupeKey && this._inflightGets.has(dedupeKey)) {
+      return this._inflightGets.get(dedupeKey);
+    }
+    const work = this._apiRequest(endpoint, options);
+    if (dedupeKey) {
+      this._inflightGets.set(dedupeKey, work);
+      work.finally(() => this._inflightGets.delete(dedupeKey));
+    }
+    return work;
+  },
+
+  async _apiRequest(endpoint, options = {}) {
     const token = localStorage.getItem('buxinev_token');
     const headers = { ...(options.headers || {}) };
     if (!(options.body instanceof FormData)) {
@@ -345,8 +419,8 @@ const BuxinEV = {
 
     const method = (options.method || 'GET').toUpperCase();
     const read = !['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
-
     const isWrite = !read;
+
     let res;
     try {
       res = await this.fetchWithRetry(`${this.API_URL}${endpoint}`, {

@@ -17,6 +17,7 @@ const Admin = {
   async init() {
     if (!Auth.requireAuth() || !Auth.requireAdmin()) return;
     await this.loadStats();
+    await this.loadClassPeriodPanel();
     await this.loadStudents();
     await this.loadPayments();
     await this.loadAdminClasses();
@@ -95,6 +96,8 @@ const Admin = {
     document.getElementById('payment-filter')?.addEventListener('change', () => this.loadPayments());
     document.getElementById('payment-country-filter')?.addEventListener('change', () => this.loadPayments());
     document.getElementById('payment-class-filter')?.addEventListener('change', () => this.loadPayments());
+
+    document.getElementById('start-class-period-btn')?.addEventListener('click', () => this.startClassPeriod());
 
     document.getElementById('create-class-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -213,9 +216,69 @@ const Admin = {
       const stats = await BuxinEV.api('/api/admin/stats');
       Object.entries(stats).forEach(([key, val]) => {
         const el = document.getElementById(`stat-${key.replace(/_/g, '-')}`);
-        if (el) el.textContent = val;
+        if (el && typeof val !== 'boolean' && key !== 'class_period_started_at') el.textContent = val;
       });
     } catch { /* silent */ }
+  },
+
+  async loadClassPeriodPanel() {
+    const statusEl = document.getElementById('class-period-status-text');
+    const waitingEl = document.getElementById('class-period-waiting-text');
+    const btn = document.getElementById('start-class-period-btn');
+    if (!statusEl || !btn) return;
+    try {
+      const data = await BuxinEV.api('/api/admin/class-period');
+      if (data.class_period_started) {
+        const when = data.class_period_started_at
+          ? BuxinEV.formatDate(data.class_period_started_at)
+          : '';
+        statusEl.textContent = when
+          ? `Class period is live since ${when}. Day 1–30 is counting for enrolled students.`
+          : 'Class period is live. Day 1–30 is counting for enrolled students.';
+        btn.disabled = true;
+        btn.textContent = 'Class period started';
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-secondary');
+        if (waitingEl) waitingEl.classList.add('hidden');
+      } else {
+        statusEl.textContent = 'Registration is open. The 30-day progress bar has not started yet.';
+        const n = data.students_waiting_start ?? 0;
+        if (waitingEl) {
+          waitingEl.textContent = n
+            ? `${n} approved student${n === 1 ? '' : 's'} will begin at Day 1 when you press Start.`
+            : 'Approve payments first, then press Start when classes begin.';
+          waitingEl.classList.remove('hidden');
+        }
+        btn.disabled = false;
+        btn.textContent = 'Start Day 1 for all classes';
+      }
+    } catch {
+      statusEl.textContent = 'Could not load class period status.';
+    }
+  },
+
+  async startClassPeriod() {
+    const btn = document.getElementById('start-class-period-btn');
+    if (!btn || btn.disabled) return;
+    if (!confirm(
+      'Start the 30-day class period for ALL active students now?\n\n'
+      + 'Day 1 will begin today. Students who register after this still get their own 30 days when you approve payment.',
+    )) return;
+    btn.disabled = true;
+    try {
+      const res = await BuxinEV.api('/api/admin/class-period/start', { method: 'POST' });
+      BuxinEV.showToast(res.message || 'Class period started', 'success');
+      await this.loadClassPeriodPanel();
+      await this.loadStats();
+    } catch (err) {
+      if (err.status === 409) {
+        BuxinEV.showToast('Class period was already started', 'info');
+        await this.loadClassPeriodPanel();
+      } else {
+        BuxinEV.showToast(err.error || 'Could not start class period', 'error');
+        btn.disabled = false;
+      }
+    }
   },
 
   async loadStudents(search = '') {
@@ -234,7 +297,6 @@ const Admin = {
       const tbody = document.getElementById('students-table');
       if (!tbody) return;
       tbody.innerHTML = students.map(s => {
-        const c = BuxinEV.COUNTRIES[s.country_code];
         const pic = s.profile_picture
           ? `<img src="${s.profile_picture}" class="receipt-thumb" alt="" style="border-radius:50%">`
           : '';
@@ -242,7 +304,7 @@ const Admin = {
           <td data-label="Photo">${pic || '—'}</td>
           <td data-label="Name">${s.full_name}</td>
           <td data-label="Email">${s.email}</td>
-          <td data-label="Country">${c ? c.flag + ' ' + c.name : s.country_code}</td>
+          <td data-label="Country">${BuxinEV.formatUserCountry(s)}</td>
           <td data-label="Class">${this.classLabel(s.class_type)}</td>
           <td data-label="Status"><span class="status-badge status-${s.status}">${s.status}</span></td>
           <td data-label="Date">${BuxinEV.formatDate(s.created_at)}</td>
@@ -301,8 +363,7 @@ const Admin = {
     const esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     try {
       const { student } = await BuxinEV.api(`/api/admin/students/${id}`);
-      const c = BuxinEV.COUNTRIES[student.country_code];
-      const countryLabel = esc(c ? `${c.flag} ${c.name}` : student.country_code);
+      const countryLabel = esc(BuxinEV.formatUserCountry(student));
       const pic = student.profile_picture
         ? `<p class="mb-3"><img src="${esc(student.profile_picture)}" alt="" class="receipt-thumb" style="border-radius:50%"></p>`
         : '';

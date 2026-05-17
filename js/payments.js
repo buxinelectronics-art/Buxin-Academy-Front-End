@@ -561,15 +561,16 @@ const Payments = {
 
 
 
-    if (cached && Auth.isSubscriptionActive(cached)) {
+    if (cached && Auth.hasPaidAccess(cached)) {
       void Auth.refreshUserInBackground();
-      return this.initPaymentHistory();
+      void this.initPaymentHistory();
+      return;
     }
 
     const user = cached || await Auth.refreshUserFresh();
     if (!user) return;
 
-    if (Auth.isSubscriptionActive(user)) {
+    if (Auth.hasPaidAccess(user)) {
       return this.initPaymentHistory();
     }
 

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -47,7 +47,7 @@
           phone: document.getElementById('phone').value,
           city: document.getElementById('city').value,
           password: document.getElementById('password').value,
-          country_code: BuxinEV.getCountryCode(),
+          ...BuxinEV.getRegistrationCountry(),
           class_type: document.getElementById('class_type').value,
         });
         const type = document.getElementById('class_type').value;

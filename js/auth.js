@@ -14,9 +14,16 @@ const Auth = {
   /** Dashboard, community, etc. — only with an active monthly subscription */
   ACTIVE_ONLY_PAGES: ['dashboard.html', 'community.html'],
 
+  /** True when Day 1–30 is running (admin has started the class period). */
   isSubscriptionActive(user) {
     if (!user || user.role === 'admin') return true;
-    return user.status === 'active' && user.subscription_active !== false;
+    return user.subscription_active === true;
+  },
+
+  /** Paid and approved — can use dashboard while waiting for class start. */
+  hasPaidAccess(user) {
+    if (!user || user.role === 'admin') return true;
+    return user.status === 'active';
   },
 
   currentPage() {
@@ -37,6 +44,7 @@ const Auth = {
   saveSession(token, user) {
     localStorage.setItem('buxinev_token', token);
     localStorage.setItem('buxinev_user', JSON.stringify(user));
+    BuxinEV.syncCountryFromUser(user);
   },
 
   clearSession() {
@@ -181,13 +189,13 @@ const Auth = {
 
   async studentDestination(user) {
     if (user.role === 'admin') return 'admin-dashboard.html';
-    if (this.isSubscriptionActive(user)) return 'dashboard.html';
+    if (this.hasPaidAccess(user)) return 'dashboard.html';
     return this.resolvePendingRedirect(user);
   },
 
   isSafeNextForUser(user, next) {
     if (!next) return null;
-    if (this.isSubscriptionActive(user)) return next;
+    if (this.hasPaidAccess(user)) return next;
     const path = next.split('?')[0];
     if (path === 'payment.html' || path === 'waiting-approval.html') return next;
     return null;
@@ -198,7 +206,7 @@ const Auth = {
       window.location.href = 'admin-dashboard.html';
       return;
     }
-    if (this.isSubscriptionActive(user)) {
+    if (this.hasPaidAccess(user)) {
       window.location.href = nextOverride || 'dashboard.html';
       return;
     }
@@ -218,7 +226,8 @@ const Auth = {
   /** Pending students may only complete payment or wait; active students use the app. */
   async canAccessPage(user, page) {
     if (!user || user.role === 'admin') return true;
-    if (this.isSubscriptionActive(user)) {
+    if (this.hasPaidAccess(user)) {
+      if (page === 'community.html') return this.isSubscriptionActive(user);
       return page !== 'waiting-approval.html';
     }
     if (user.status === 'expired') {
@@ -241,16 +250,25 @@ const Auth = {
     const cached = this.getUser();
 
     const appPages = [...this.ACTIVE_ONLY_PAGES, 'dashboard.html', 'payment.html'];
-    if (cached && this.isSubscriptionActive(cached) && appPages.includes(page)) {
-      void this.updateNavLinks(cached);
-      void this.refreshUser({ allowStale: true }).then((fresh) => {
-        if (!fresh) return;
-        this.saveSession(localStorage.getItem('buxinev_token'), fresh);
-        if (!this.isSubscriptionActive(fresh)) {
-          void this.resolvePendingRedirect(fresh).then((dest) => { window.location.href = dest; });
-        }
-      });
-      return;
+    if (cached && this.hasPaidAccess(cached) && appPages.includes(page)) {
+      if (page === 'community.html' && !this.isSubscriptionActive(cached)) {
+        /* fall through — community needs running 30-day period */
+      } else {
+        void this.updateNavLinks(cached);
+        void this.refreshUser({ allowStale: true }).then((fresh) => {
+          if (!fresh) return;
+          this.saveSession(localStorage.getItem('buxinev_token'), fresh);
+          if (page === 'community.html' && !this.isSubscriptionActive(fresh)) {
+            BuxinEV.showToast('Community opens when your instructor starts the 30-day class period.', 'info');
+            window.location.href = 'dashboard.html';
+            return;
+          }
+          if (fresh.status !== 'active' && !this.isSubscriptionActive(fresh)) {
+            void this.resolvePendingRedirect(fresh).then((dest) => { window.location.href = dest; });
+          }
+        });
+        return;
+      }
     }
 
     if (cached) void this.updateNavLinks(cached);
@@ -267,11 +285,17 @@ const Auth = {
 
     await this.updateNavLinks(user);
 
-    if (this.isSubscriptionActive(user)) {
+    if (this.hasPaidAccess(user)) {
       if (page === 'waiting-approval.html') {
         window.location.href = 'dashboard.html';
+        return;
       }
-      return;
+      if (page === 'community.html' && !this.isSubscriptionActive(user)) {
+        BuxinEV.showToast('Community opens when your instructor starts the 30-day class period.', 'info');
+        window.location.href = 'dashboard.html';
+        return;
+      }
+      if (page === 'dashboard.html' || page === 'payment.html') return;
     }
 
     if (user.status === 'expired' && page === 'payment.html') {
@@ -292,7 +316,7 @@ const Auth = {
     if (!user) return;
     const home = user.role === 'admin'
       ? 'admin-dashboard.html'
-      : this.isSubscriptionActive(user)
+      : this.hasPaidAccess(user)
         ? 'dashboard.html'
         : await this.studentDestination(user);
     document.querySelectorAll('a.logo').forEach((a) => {
@@ -312,19 +336,20 @@ const Auth = {
   /** Logged-in users should not stay on marketing/signup pages (except individual schedule step). */
   async guardPublicEntry() {
     if (!this.isLoggedIn()) return;
+    const page = this.currentPage();
     const cached = this.getUser();
-    if (cached) await this.updateNavLinks(cached);
-    const user = await this.refreshUserFresh() || cached;
+    if (cached) void this.updateNavLinks(cached);
+    if (!this.PUBLIC_PAGES.includes(page)) return;
+
+    const user = cached || await this.refreshUserFresh();
     if (!user) return;
     await this.updateNavLinks(user);
-    const page = this.currentPage();
-    if (!this.PUBLIC_PAGES.includes(page)) return;
 
     if (user.role === 'admin') {
       window.location.href = 'admin-dashboard.html';
       return;
     }
-    if (this.isSubscriptionActive(user)) {
+    if (this.hasPaidAccess(user)) {
       await this.goToStudentHome(user);
       return;
     }
