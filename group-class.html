@@ -58,7 +58,7 @@
           <input type="text" id="coupon-code" class="input" placeholder="Enter code" style="flex:1;min-width:140px;margin:0;text-transform:uppercase" autocomplete="off">
           <button type="button" id="apply-coupon-btn" class="btn btn-secondary">Apply</button>
         </div>
-        <p class="text-sm opacity-70 mt-1">Covers this 30-day month only — renew with pay or a new coupon next month.</p>
+        <p class="text-sm opacity-70 mt-1">Fill in your details above first, then Apply. Covers this 30-day month only — renew with pay or a new coupon next month.</p>
         <p id="coupon-hint" class="text-sm opacity-70 mt-1 hidden"></p>
       </div>
       <p class="payment-amount" id="payment-amount" data-price-group style="font-size:1.75rem;margin-bottom:0.25rem">D362.50</p>
@@ -122,7 +122,7 @@
     void Payments.renderPaymentMethods(document.getElementById('payment-methods'), 'group', {
       beforeAuth: ensureRegisteredForPay,
     });
-    Payments.bindCouponUI('group');
+    Payments.bindCouponUI('group', { beforeAuth: ensureRegisteredForPay });
 
     let receiptFile = null;
     document.getElementById('receipt-file').addEventListener('change', (e) => {
@@ -152,23 +152,18 @@
       btn.disabled = true;
       status.textContent = 'Please wait…';
 
-      const file = document.getElementById('profile-file').files[0];
-      const profile_picture_base64 = file ? await BuxinEV.compressImageFile(file) : null;
-
       try {
-        const sessionUser = Auth.getUser();
-        if (Auth.isLoggedIn() && sessionUser?.email?.toLowerCase() !== email) {
-          Auth.clearSession();
-        }
-        if (!Auth.isLoggedIn()) {
-          await Auth.register({
-            full_name: fd.get('full_name'), email, phone: fd.get('phone'),
-            city: fd.get('city'), password: fd.get('password'),
-            ...BuxinEV.getRegistrationCountry(), class_type: 'group',
-            experience_level: fd.get('experience_level'),
-            learning_goals: fd.get('learning_goals'),
-            profile_picture_base64,
-          });
+        await ensureRegisteredForPay();
+        const couponCode = document.getElementById('coupon-code')?.value?.trim();
+        if (couponCode) {
+          await Payments.applyCoupon('group');
+          const user = Auth.getUser();
+          if (user?.status === 'active' && Auth.hasPaidAccess(user) && !Auth.needsRenewal(user)) {
+            BuxinEV.showToast('Registered with coupon — welcome!', 'success');
+            status.textContent = 'Redirecting…';
+            setTimeout(() => { window.location.replace('dashboard.html'); }, 800);
+            return;
+          }
         }
         if (!receipt?.size) {
           BuxinEV.showToast('Upload your payment receipt', 'error');

@@ -530,7 +530,7 @@ const Payments = {
     }
   },
 
-  async applyCoupon(classType) {
+  async applyCoupon(classType, { beforeAuth } = {}) {
     const input = document.getElementById('coupon-code');
     const code = (input?.value || '').trim();
     if (!code) {
@@ -540,6 +540,11 @@ const Payments = {
     const btn = document.getElementById('apply-coupon-btn');
     if (btn) btn.disabled = true;
     try {
+      if (beforeAuth) await beforeAuth();
+      if (!Auth.isLoggedIn()) {
+        BuxinEV.showToast('Complete your details above, then apply the coupon again.', 'error');
+        return;
+      }
       sessionStorage.setItem('buxinev_coupon', code.toUpperCase());
       const res = await BuxinEV.api('/api/payments/apply-coupon', {
         method: 'POST',
@@ -558,17 +563,22 @@ const Payments = {
       this.updateAmountFromCouponResponse(res);
       BuxinEV.showToast(res.message || 'Coupon applied', 'success');
     } catch (err) {
-      BuxinEV.showToast(err.error || 'Invalid coupon', 'error');
+      const msg = err.error || err.message || 'Invalid coupon';
+      if (err.status === 401 || msg === 'Authentication required') {
+        BuxinEV.showToast('Fill in your details above, then apply the coupon again.', 'error');
+      } else {
+        BuxinEV.showToast(msg, 'error');
+      }
     } finally {
       if (btn) btn.disabled = false;
     }
   },
 
-  bindCouponUI(classType) {
+  bindCouponUI(classType, options = {}) {
     if (this._couponUiBound) return;
     this._couponUiBound = true;
     document.getElementById('apply-coupon-btn')?.addEventListener('click', () => {
-      void this.applyCoupon(classType);
+      void this.applyCoupon(classType, options);
     });
     const saved = sessionStorage.getItem('buxinev_coupon');
     const input = document.getElementById('coupon-code');
