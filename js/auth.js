@@ -113,9 +113,12 @@ const Auth = {
 
   async refreshUser({ allowStale = false } = {}) {
     try {
-      const data = await BuxinEV.api('/api/auth/me');
-      this.saveSession(localStorage.getItem('buxinev_token'), data.user);
-      return data.user;
+      const data = await BuxinEV.api(`/api/auth/me?_=${Date.now()}`);
+      if (data?.user) {
+        this.saveSession(localStorage.getItem('buxinev_token'), data.user);
+        return data.user;
+      }
+      return null;
     } catch (err) {
       if (this.isAuthError(err)) {
         this.clearSession();
@@ -267,6 +270,10 @@ const Auth = {
         this.saveSession(localStorage.getItem('buxinev_token'), fresh);
         if (this.needsRenewal(fresh)) {
           void this.resolvePendingRedirect(fresh).then((dest) => { window.location.href = dest; });
+          return;
+        }
+        if (page === 'dashboard.html' && typeof Dashboard !== 'undefined') {
+          Dashboard.renderProfile(fresh);
         }
       });
       return;

@@ -17,29 +17,10 @@ const Dashboard = {
       this.hydrateFromCache();
     }
 
-    void Auth.refreshUserInBackground();
+    const user = (await Auth.refreshUserFresh()) || cached;
+    if (!user) return;
 
-    const user = cached;
-    if (!user) {
-      const fresh = await Auth.refreshUserFresh();
-      if (!fresh) return;
-      if (fresh.role === 'admin') {
-        window.location.href = 'admin-dashboard.html';
-        return;
-      }
-      if (!Auth.hasPaidAccess(fresh)) {
-        window.location.replace(await Auth.resolvePendingRedirect(fresh));
-        return;
-      }
-      this.renderProfile(fresh);
-      if (fresh.class_type === 'individual') {
-        document.getElementById('schedule-info')?.classList.remove('hidden');
-      }
-      void this.refreshAllSections(fresh, { useCache: false });
-      setTimeout(() => this.initSocket(fresh.id), 800);
-      this.startCountdown();
-      return;
-    }
+    this.renderProfile(user);
 
     if (user.role === 'admin') {
       window.location.href = 'admin-dashboard.html';
@@ -47,15 +28,12 @@ const Dashboard = {
     }
 
     if (Auth.needsRenewal(user)) {
-      void Auth.resolvePendingRedirect(user).then((dest) => { window.location.replace(dest); });
+      window.location.replace(await Auth.resolvePendingRedirect(user));
       return;
     }
+
     if (!Auth.hasPaidAccess(user)) {
-      void Auth.refreshUserFresh().then((fresh) => {
-        if (fresh && !Auth.hasPaidAccess(fresh)) {
-          void Auth.resolvePendingRedirect(fresh).then((dest) => { window.location.replace(dest); });
-        }
-      });
+      window.location.replace(await Auth.resolvePendingRedirect(user));
       return;
     }
 
@@ -67,7 +45,9 @@ const Dashboard = {
       && (BuxinEV.cacheFresh('payments') || BuxinEV.cacheFresh('notifications') || BuxinEV.cacheFresh('classes'));
     void this.refreshAllSections(user, { useCache: cacheOk });
 
-
+    void Auth.refreshUser({ allowStale: true }).then((fresh) => {
+      if (fresh) this.renderProfile(fresh);
+    });
 
     setTimeout(() => this.initSocket(user.id), 800);
     this.startCountdown();
@@ -120,64 +100,53 @@ const Dashboard = {
 
 
   renderProfile(user) {
+    if (!user) return;
 
-    const set = (id, text) => {
-
+    const setText = (id, text) => {
       const el = document.getElementById(id);
-
-      if (el && text != null && text !== '') el.textContent = text;
-
+      if (el) el.textContent = text != null && text !== '' ? text : '—';
     };
 
-    set('user-name', user.full_name);
-
-    set('user-email', user.email);
-
-    set('user-phone', user.phone || '—');
-
-    set('user-city', user.city || '—');
-
-    set('user-experience', user.experience_level || '—');
-
-    set('user-goals', user.learning_goals || '—');
-
-
+    setText('user-name', user.full_name);
+    setText('user-email', user.email);
+    setText('user-phone', user.phone);
+    setText('user-city', user.city);
+    setText('user-experience', user.experience_level);
+    setText('user-goals', user.learning_goals);
 
     const statusEl = document.getElementById('user-status');
-
     if (statusEl) {
-
-      statusEl.textContent = user.status;
-
-      statusEl.className = `status-badge status-${user.status}`;
-
+      statusEl.textContent = user.status || 'pending';
+      statusEl.className = `status-badge status-${user.status || 'pending'}`;
     }
 
-    set('user-class', user.class_type === 'individual'
-
+    const classLabel = user.class_type === 'individual'
       ? 'Individual Mentorship (6 months)'
-
-      : 'Group Class (Sundays)');
+      : user.class_type === 'group'
+        ? 'Group Class (Sundays)'
+        : '—';
+    setText('user-class', classLabel);
 
     const courseRow = document.getElementById('user-course-row');
     if (user.class_type === 'individual') {
       courseRow?.classList.remove('hidden');
-      set('user-course', user.selected_course_name || '—');
+      setText('user-course', user.selected_course_name);
     } else {
       courseRow?.classList.add('hidden');
     }
 
     const avatar = document.getElementById('user-avatar');
-
-    if (avatar && user.profile_picture) {
-
-      avatar.src = user.profile_picture;
-
-      avatar.classList.remove('hidden');
-
+    if (avatar) {
+      if (user.profile_picture) {
+        avatar.src = user.profile_picture;
+        avatar.classList.remove('hidden');
+      } else {
+        avatar.classList.add('hidden');
+        avatar.removeAttribute('src');
+      }
     }
 
-    set('user-country', BuxinEV.formatUserCountry(user));
+    setText('user-country', BuxinEV.formatUserCountry(user));
 
     this.renderSubscription(user);
 
