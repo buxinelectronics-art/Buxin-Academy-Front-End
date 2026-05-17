@@ -168,6 +168,20 @@ label { display: block; margin-bottom: 0.35rem; font-size: 0.9rem; color: var(--
   margin: 0.5rem 0 0;
 }
 .post-upload-status.hidden { display: none; }
+.post-card.post-syncing { opacity: 0.98; }
+.post-card.post-syncing .sync-pill {
+  display: inline-block;
+  margin-left: 0.35rem;
+  padding: 0.1rem 0.45rem;
+  font-size: 0.7rem;
+  border-radius: 999px;
+  background: rgba(14, 165, 233, 0.15);
+  color: var(--primary-dark);
+  vertical-align: middle;
+}
+.like-btn { transition: transform 0.15s ease; }
+.like-btn.liked { transform: scale(1.05); }
+.like-btn:active { transform: scale(0.95); }
 .post-card.post-pending { opacity: 0.92; border-style: dashed; }
 .post-card.post-pending .pending-label {
   font-size: 0.75rem;

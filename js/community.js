@@ -10,6 +10,42 @@ const Community = {
   _liking: new Set(),
   _lastLocalPostAt: 0,
 
+  buildOptimisticPost({ id, content, imageUrl, youtubeId }) {
+    const user = Auth.getUser();
+    return {
+      id,
+      _optimistic: true,
+      user_id: user?.id,
+      author_name: user?.full_name || 'You',
+      author_role: user?.role || 'student',
+      content: content || (imageUrl ? '📷' : '') || (youtubeId ? '🎬' : ''),
+      image_url: imageUrl || null,
+      youtube_video_id: youtubeId || null,
+      like_count: 0,
+      liked: false,
+      comment_count: 0,
+      comments: [],
+      created_at: new Date().toISOString(),
+      is_pinned: false,
+      is_announcement: false,
+    };
+  },
+
+  patchPostInCache(postId, patch) {
+    const cached = BuxinEV.cacheGet('community_posts') || [];
+    const idx = cached.findIndex((p) => String(p.id) === String(postId));
+    if (idx < 0) return;
+    cached[idx] = { ...cached[idx], ...patch };
+    BuxinEV.cacheSet('community_posts', cached);
+  },
+
+  removePostFromCache(postId) {
+    const cached = (BuxinEV.cacheGet('community_posts') || []).filter(
+      (p) => String(p.id) !== String(postId),
+    );
+    BuxinEV.cacheSet('community_posts', cached);
+  },
+
   canUse(user) {
     return user && (user.role === 'admin' || Auth.isSubscriptionActive(user));
   },
@@ -119,7 +155,7 @@ const Community = {
 
     const form = document.getElementById('post-form');
     form?.addEventListener('submit', (e) => {
-      void this.submitPost(e);
+      this.submitPost(e);
     });
 
     document.getElementById('post-image')?.addEventListener('change', (e) => {
@@ -241,33 +277,30 @@ const Community = {
     form?.classList.remove('is-submitting');
   },
 
-  prependPendingPost({ pendingId, content, localImageUrl, youtubeId }) {
+  replaceOptimisticPost(pendingId, realPost) {
     const user = Auth.getUser();
-    const feed = document.getElementById('community-feed');
-    if (!feed) return;
-    feed.querySelector('.empty-state')?.remove();
-    feed.insertAdjacentHTML('afterbegin', `
-      <article class="post-card glass post-pending" data-pending-id="${pendingId}">
-        <p class="pending-label">Uploading your post…</p>
-        <header class="post-header">
-          <div class="avatar-sm">${user?.full_name?.[0] || '?'}</div>
-          <div><strong>${this.escape(user?.full_name || 'You')}</strong> <small>Just now</small></div>
-        </header>
-        ${this.renderPostBody({ content, youtube_video_id: youtubeId })}
-        ${localImageUrl ? `<img src="${localImageUrl}" alt="" class="post-image">` : ''}
-      </article>`);
+    const el = document.querySelector(`[data-post-id="${pendingId}"]`);
+    if (el) {
+      el.outerHTML = this.renderPost(realPost, user);
+    } else {
+      this.prependPost(realPost);
+    }
+    const cached = BuxinEV.cacheGet('community_posts') || [];
+    BuxinEV.cacheSet(
+      'community_posts',
+      [realPost, ...cached.filter((p) => String(p.id) !== String(pendingId) && p.id !== realPost.id)],
+    );
   },
 
-  removePendingPost(pendingId) {
-    document.querySelector(`[data-pending-id="${pendingId}"]`)?.remove();
+  removeOptimisticPost(pendingId) {
+    document.querySelector(`[data-post-id="${pendingId}"]`)?.remove();
+    this.removePostFromCache(pendingId);
   },
 
-  async submitPost(e) {
+  submitPost(e) {
     e.preventDefault();
     this.cancelFeedLoad();
 
-    const form = e.currentTarget;
-    const btn = document.getElementById('post-submit-btn') || form.querySelector('[type=submit]');
     const contentEl = document.getElementById('post-content');
     const content = contentEl?.value.trim() || '';
     const file = document.getElementById('post-image')?.files?.[0];
@@ -277,62 +310,52 @@ const Community = {
       return;
     }
 
-    const prevLabel = btn?.textContent || 'Post';
     const pendingId = `pending-${Date.now()}`;
-    let localPreviewUrl = null;
+    const localPreviewUrl = file ? URL.createObjectURL(file) : null;
+    const savedContent = content;
+    const savedFile = file;
 
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = file ? 'Preparing…' : 'Posting…';
-    }
-    form.classList.add('is-submitting');
+    const optimistic = this.buildOptimisticPost({
+      id: pendingId,
+      content,
+      imageUrl: localPreviewUrl,
+      youtubeId,
+    });
+    this._lastLocalPostAt = Date.now();
+    this.prependPost(optimistic);
+    this.clearPostForm();
 
-    if (!file) {
-      contentEl.value = '';
-      this.setVideoPreview(null);
-      this.releasePostForm(form, btn, prevLabel);
-    }
-
-    try {
-      let result;
-      if (file) {
-        this.setUploadStatus('Preparing photo…');
-        let blob = this._compressedBlob;
-        if (!blob) {
-          blob = await BuxinEV.compressImageToBlob(file);
-          this._compressedBlob = blob;
+    void (async () => {
+      try {
+        let result;
+        if (savedFile) {
+          let blob = this._compressedBlob;
+          if (!blob) {
+            blob = await BuxinEV.compressImageToBlob(savedFile);
+            this._compressedBlob = blob;
+          }
+          const fd = new FormData();
+          fd.append('content', savedContent);
+          fd.append('image', blob, 'photo.jpg');
+          result = await BuxinEV.apiMultipart('/api/community/posts', fd);
+        } else {
+          result = await BuxinEV.api('/api/community/posts', {
+            method: 'POST',
+            body: JSON.stringify({ content: savedContent }),
+          });
         }
-        localPreviewUrl = URL.createObjectURL(blob);
-        this.prependPendingPost({ pendingId, content, localImageUrl: localPreviewUrl, youtubeId });
-        this.setUploadStatus('Uploading…');
-        if (btn) btn.textContent = 'Uploading…';
-
-        const fd = new FormData();
-        fd.append('content', content);
-        fd.append('image', blob, 'photo.jpg');
-        result = await BuxinEV.apiMultipart('/api/community/posts', fd);
-      } else {
-        result = await BuxinEV.api('/api/community/posts', {
-          method: 'POST',
-          body: JSON.stringify({ content }),
-        });
+        if (result?.post) {
+          this.replaceOptimisticPost(pendingId, result.post);
+        } else {
+          this.removeOptimisticPost(pendingId);
+        }
+      } catch (err) {
+        this.removeOptimisticPost(pendingId);
+        BuxinEV.showToast(err.error || 'Post did not save — refresh and try again', 'error');
+      } finally {
+        if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
       }
-
-      this.removePendingPost(pendingId);
-      this.clearPostForm();
-      if (result?.post) {
-        this._lastLocalPostAt = Date.now();
-        this.prependPost(result.post);
-      }
-      BuxinEV.showToast('Post shared!', 'success');
-    } catch (err) {
-      this.removePendingPost(pendingId);
-      if (!file && content) contentEl.value = content;
-      BuxinEV.showToast(err.error || 'Failed to post', 'error');
-    } finally {
-      if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
-      this.releasePostForm(form, btn, prevLabel);
-    }
+    })();
   },
 
   replacePost(post) {
@@ -415,16 +438,18 @@ const Community = {
     const canDelete = isAdmin || p.user_id === user?.id;
     const comments = (p.comments || []).map((c) => this.renderComment(c)).join('');
     const adminBadge = p.author_role === 'admin' ? ' <span class="admin-badge">Admin</span>' : '';
+    const syncing = !!p._optimistic;
+    const timeLabel = syncing ? 'Just now' : BuxinEV.formatDate(p.created_at);
 
     return `
-      <article class="post-card glass ${p.is_pinned ? 'pinned' : ''}" data-post-id="${p.id}">
+      <article class="post-card glass ${p.is_pinned ? 'pinned' : ''}${syncing ? ' post-syncing' : ''}" data-post-id="${p.id}">
         ${p.is_pinned ? '<span class="pin-badge">📌 Pinned</span>' : ''}
         ${p.is_announcement ? '<span class="announce-badge">📢 Announcement</span>' : ''}
         <header class="post-header">
           <div class="avatar-sm">${p.author_name?.[0] || '?'}</div>
           <div>
             <strong>${this.escape(p.author_name)}</strong>${adminBadge}
-            <small>${BuxinEV.formatDate(p.created_at)}</small>
+            <small>${timeLabel}${syncing ? ' <span class="sync-pill">Saving</span>' : ''}</small>
           </div>
         </header>
         ${this.renderPostBody(p)}
@@ -454,38 +479,43 @@ const Community = {
     return d.innerHTML;
   },
 
-  async toggleLike(postId, btn) {
+  toggleLike(postId, btn) {
     const id = String(postId);
-    if (this._liking.has(id)) return;
-    this._liking.add(id);
+    if (String(postId).startsWith('pending-')) return;
 
     const countEl = document.querySelector(`[data-like-count="${postId}"]`);
     const wasLiked = btn?.classList.contains('liked');
     const prevCount = parseInt(countEl?.textContent || '0', 10) || 0;
-    if (btn) {
-      btn.classList.toggle('liked', !wasLiked);
-      btn.disabled = true;
-    }
-    if (countEl) {
-      countEl.textContent = String(Math.max(0, prevCount + (wasLiked ? -1 : 1)));
-    }
+    const nextLiked = !wasLiked;
+    const nextCount = Math.max(0, prevCount + (wasLiked ? -1 : 1));
 
-    try {
-      const res = await BuxinEV.api(`/api/community/posts/${postId}/like`, { method: 'POST' });
-      if (countEl) countEl.textContent = String(res.like_count ?? 0);
-      if (btn) btn.classList.toggle('liked', !!res.liked);
-    } catch (err) {
-      if (btn) btn.classList.toggle('liked', wasLiked);
-      if (countEl) countEl.textContent = String(prevCount);
-      BuxinEV.showToast(err.error || 'Could not like', 'error');
-    } finally {
-      this._liking.delete(id);
-      if (btn) btn.disabled = false;
-    }
+    if (btn) btn.classList.toggle('liked', nextLiked);
+    if (countEl) countEl.textContent = String(nextCount);
+    this.patchPostInCache(postId, { liked: nextLiked, like_count: nextCount });
+
+    if (this._liking.has(id)) return;
+    this._liking.add(id);
+
+    void (async () => {
+      try {
+        const res = await BuxinEV.api(`/api/community/posts/${postId}/like`, { method: 'POST' });
+        if (countEl) countEl.textContent = String(res.like_count ?? 0);
+        if (btn) btn.classList.toggle('liked', !!res.liked);
+        this.patchPostInCache(postId, { liked: !!res.liked, like_count: res.like_count ?? 0 });
+      } catch (err) {
+        if (btn) btn.classList.toggle('liked', wasLiked);
+        if (countEl) countEl.textContent = String(prevCount);
+        this.patchPostInCache(postId, { liked: wasLiked, like_count: prevCount });
+        BuxinEV.showToast(err.error || 'Could not save like', 'error');
+      } finally {
+        this._liking.delete(id);
+      }
+    })();
   },
 
-  async submitComment(postId) {
+  submitComment(postId) {
     const id = String(postId);
+    if (String(postId).startsWith('pending-')) return;
     if (this._commenting.has(id)) return;
 
     const input = document.querySelector(`[data-comment-input="${postId}"]`);
@@ -495,37 +525,51 @@ const Community = {
       input?.focus();
       return;
     }
-    const btn = document.querySelector(`[data-comment-btn="${postId}"]`);
-    const prevLabel = btn?.textContent || 'Post';
 
+    const user = Auth.getUser();
+    const tempId = `comment-pending-${Date.now()}`;
     input.value = '';
-    this._commenting.add(id);
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = '…';
-    }
+    this.appendCommentToPost(postId, {
+      id: tempId,
+      author_name: user?.full_name || 'You',
+      content,
+      created_at: new Date().toISOString(),
+    });
 
-    try {
-      const { comment } = await BuxinEV.api(`/api/community/posts/${postId}/comment`, {
-        method: 'POST',
-        body: JSON.stringify({ content }),
-      });
-      this.appendCommentToPost(postId, comment);
-    } catch (err) {
-      input.value = content;
-      BuxinEV.showToast(err.error || 'Comment failed', 'error');
-    } finally {
-      this._commenting.delete(id);
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = prevLabel;
+    this._commenting.add(id);
+    void (async () => {
+      try {
+        const { comment } = await BuxinEV.api(`/api/community/posts/${postId}/comment`, {
+          method: 'POST',
+          body: JSON.stringify({ content }),
+        });
+        document.getElementById(`comments-${postId}`)
+          ?.querySelector(`[data-comment-id="${tempId}"]`)?.remove();
+        this.appendCommentToPost(postId, comment);
+      } catch (err) {
+        document.getElementById(`comments-${postId}`)
+          ?.querySelector(`[data-comment-id="${tempId}"]`)?.remove();
+        const card = document.querySelector(`[data-post-id="${postId}"]`);
+        const countEl = card?.querySelector('[data-comment-count]');
+        if (countEl) {
+          const n = Math.max(0, (parseInt(countEl.textContent, 10) || 1) - 1);
+          countEl.textContent = String(n);
+        }
+        input.value = content;
+        BuxinEV.showToast(err.error || 'Comment did not save', 'error');
+      } finally {
+        this._commenting.delete(id);
       }
-    }
+    })();
   },
 
   async deletePost(postId) {
     if (!confirm('Delete this post?')) return;
     this.cancelFeedLoad();
+    if (String(postId).startsWith('pending-')) {
+      this.removeOptimisticPost(postId);
+      return;
+    }
     try {
       await BuxinEV.api(`/api/community/posts/${postId}`, { method: 'DELETE' });
       document.querySelector(`[data-post-id="${postId}"]`)?.remove();
