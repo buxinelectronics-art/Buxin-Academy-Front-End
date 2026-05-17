@@ -65,7 +65,7 @@ const Community = {
   },
 
   canUse(user) {
-    return user && (user.role === 'admin' || Auth.isSubscriptionActive(user));
+    return user && (user.role === 'admin' || Auth.hasPaidAccess(user));
   },
 
   parseYouTubeId(text) {
@@ -125,11 +125,11 @@ const Community = {
     BuxinEV.initStudentNav('community');
 
     const cached = Auth.getUser();
-    if (cached && this.canUse(cached)) {
+    if (cached && this.canUse(cached) && !Auth.needsRenewal(cached)) {
       void Auth.refreshUserInBackground();
     } else {
       const user = await Auth.refreshUserFresh() || cached;
-      if (!this.canUse(user)) {
+      if (!this.canUse(user) || Auth.needsRenewal(user)) {
         window.location.replace(await Auth.resolvePendingRedirect(user || cached));
         return;
       }

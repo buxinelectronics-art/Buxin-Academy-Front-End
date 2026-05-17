@@ -46,6 +46,10 @@ const Dashboard = {
       return;
     }
 
+    if (Auth.needsRenewal(user)) {
+      void Auth.resolvePendingRedirect(user).then((dest) => { window.location.replace(dest); });
+      return;
+    }
     if (!Auth.hasPaidAccess(user)) {
       void Auth.refreshUserFresh().then((fresh) => {
         if (fresh && !Auth.hasPaidAccess(fresh)) {
@@ -191,11 +195,11 @@ const Dashboard = {
       if (dayLabel) dayLabel.textContent = 'Class period not started yet';
       if (progressWrap) progressWrap.classList.add('hidden');
       if (awaitingEl) {
-        awaitingEl.textContent = 'You are registered and paid. Day 1 of 30 will begin when your instructor starts the class. Community and the progress bar unlock then.';
+        awaitingEl.textContent = 'You have full access to the community now. Day 1 of 30 starts when your instructor begins the class period.';
         awaitingEl.classList.remove('hidden');
       }
       const detail = document.getElementById('subscription-status');
-      if (detail) detail.textContent = 'Thank you for joining — sit tight until classes officially begin.';
+      if (detail) detail.textContent = 'Live classes will show “coming very soon” until then.';
       document.getElementById('subscription-expiry-warning')?.classList.add('hidden');
       renew?.classList.add('hidden');
       return;
@@ -349,6 +353,17 @@ const Dashboard = {
 
 
 
+  renderClassesComingSoon() {
+    const container = document.getElementById('class-links');
+    if (!container) return;
+    container.innerHTML = `
+      <div class="class-card glass class-card--soon">
+        <span class="live-badge live-badge--soon">Starting soon</span>
+        <h4>Live class coming very soon</h4>
+        <p class="text-sm opacity-80">You are registered and approved. Your instructor will start the class period soon — then Day 1 of 30 and join links will appear here.</p>
+      </div>`;
+  },
+
   renderClasses(classes) {
 
     const container = document.getElementById('class-links');
@@ -384,6 +399,11 @@ const Dashboard = {
 
 
   async loadClasses() {
+    const user = Auth.getUser();
+    if (user?.awaiting_class_start) {
+      this.renderClassesComingSoon();
+      return;
+    }
 
     try {
 

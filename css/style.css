@@ -736,6 +736,8 @@ button.payment-method-card.instant-pay-btn:hover {
 }
 .pin-badge { background: rgba(245, 158, 11, 0.2); color: var(--accent-2); }
 .live-badge { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+.live-badge--soon { background: rgba(14, 165, 233, 0.15); color: var(--primary-dark); }
+.class-card--soon { border: 1px dashed var(--border); }
 .soon-alert { color: var(--accent-2); font-weight: 700; animation: pulse 1.5s infinite; }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
 
