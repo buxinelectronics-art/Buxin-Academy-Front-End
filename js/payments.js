@@ -551,7 +551,7 @@ const Payments = {
         document.getElementById('payment-free-notice')?.classList.remove('hidden');
         document.getElementById('payment-checkout')?.classList.add('hidden');
         document.getElementById('coupon-block')?.classList.add('hidden');
-        BuxinEV.showToast(res.message || 'Free access granted!', 'success');
+        BuxinEV.showToast(res.message || 'Coupon applied for this period.', 'success');
         setTimeout(() => { window.location.replace('dashboard.html'); }, 1200);
         return;
       }
@@ -656,7 +656,7 @@ const Payments = {
 
 
 
-    if (cached && Auth.hasPaidAccess(cached)) {
+    if (cached && Auth.hasPaidAccess(cached) && !Auth.needsRenewal(cached)) {
       void Auth.refreshUserInBackground();
       void this.initPaymentHistory();
       return;
@@ -665,7 +665,7 @@ const Payments = {
     const user = cached || await Auth.refreshUserFresh();
     if (!user) return;
 
-    if (Auth.hasPaidAccess(user)) {
+    if (Auth.hasPaidAccess(user) && !Auth.needsRenewal(user)) {
       return this.initPaymentHistory();
     }
 
@@ -731,7 +731,7 @@ const Payments = {
     const intro = document.getElementById('payment-intro');
     if (intro) {
       if (isRenewal) {
-        intro.textContent = 'Your 30-day subscription has ended. Choose a payment method below. After admin approves your receipt, you get Day 1 of 30 again — classes and community unlock.';
+        intro.textContent = 'Your class period has ended. Pay below or apply a new coupon (one coupon per period). After approval you start at Day 1 again — classes and community unlock.';
       } else if (BuxinEV.getCountryCode() === 'GM') {
         intro.textContent = 'Pick one option below — wallet is instant; bank and transfer need a receipt.';
       }

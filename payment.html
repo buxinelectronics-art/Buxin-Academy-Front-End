@@ -25,7 +25,7 @@
   <main class="container" style="padding:2rem 1rem;max-width:640px">
     <h1 id="payment-page-title">Complete Payment</h1>
     <div id="payment-renewal-notice" class="glass hidden" style="padding:1rem;margin-bottom:1rem;border-left:3px solid var(--accent)">
-      <p class="text-sm"><strong>30-day access ended.</strong> You are still registered ? pay below. After approval you start at Day 1 of 30 with full access.</p>
+      <p class="text-sm"><strong>Your class month has ended.</strong> You are still registered — renew below with payment or a <strong>new coupon</strong> (each coupon works once for one period). After approval you continue from Day 1 again.</p>
     </div>
     <p id="class-type-label" class="opacity-70">Group Robotics Class</p>
     <p id="payment-course-label" class="text-sm opacity-70 hidden"></p>
@@ -39,12 +39,13 @@
         <input type="text" id="coupon-code" class="input" placeholder="Enter code" style="flex:1;min-width:160px;margin:0;text-transform:uppercase" autocomplete="off">
         <button type="button" id="apply-coupon-btn" class="btn btn-secondary">Apply</button>
       </div>
+      <p class="text-sm opacity-70 mt-1">One coupon = one class period (30 days group / 6 months individual). Not valid after your month ends unless you get a new code.</p>
       <p id="coupon-hint" class="text-sm opacity-70 mt-2 hidden"></p>
     </div>
 
     <p id="payment-intro" class="text-sm text-center opacity-70 mb-4">Choose how you want to pay</p>
     <section id="payment-free-notice" class="glass hidden" style="padding:1rem;margin-bottom:1rem;border-left:3px solid var(--success,#22c55e)">
-      <p class="text-sm"><strong>Free access unlocked.</strong> Your coupon was applied. Redirecting to your dashboard…</p>
+      <p class="text-sm"><strong>This period is covered by your coupon.</strong> You can use classes now. When Day 1–30 (or your 6-month course) ends, come back here to pay or use a <strong>new</strong> coupon for the next period.</p>
     </section>
 
     <section id="payment-history" class="hidden">

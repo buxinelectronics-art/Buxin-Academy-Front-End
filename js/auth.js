@@ -20,9 +20,10 @@ const Auth = {
     return user.subscription_active === true;
   },
 
-  /** Paid and approved — community, dashboard, etc. (including before Day 1 starts). */
+  /** Paid and approved — community, dashboard, etc. (not after period ended). */
   hasPaidAccess(user) {
     if (!user || user.role === 'admin') return true;
+    if (this.needsRenewal(user)) return false;
     if (user.has_app_access === true) return true;
     if (user.has_app_access === false) return false;
     return user.status === 'active';
@@ -198,6 +199,7 @@ const Auth = {
 
   async studentDestination(user) {
     if (user.role === 'admin') return 'admin-dashboard.html';
+    if (this.needsRenewal(user)) return this.resolvePendingRedirect(user);
     if (this.hasPaidAccess(user)) return 'dashboard.html';
     return this.resolvePendingRedirect(user);
   },
@@ -292,7 +294,7 @@ const Auth = {
       }
     }
 
-    if (this.hasPaidAccess(user)) {
+    if (this.hasPaidAccess(user) && !this.needsRenewal(user)) {
       if (page === 'waiting-approval.html') {
         window.location.href = 'dashboard.html';
         return;
@@ -320,7 +322,7 @@ const Auth = {
     if (!user) return;
     const home = user.role === 'admin'
       ? 'admin-dashboard.html'
-      : this.hasPaidAccess(user)
+      : (this.hasPaidAccess(user) && !this.needsRenewal(user))
         ? 'dashboard.html'
         : await this.studentDestination(user);
     document.querySelectorAll('a.logo').forEach((a) => {

@@ -254,7 +254,7 @@ const Dashboard = {
       const expText = exp ? exp.toLocaleDateString(undefined, { dateStyle: 'medium' }) : '';
       const periodLabel = user.class_type === 'individual' ? '6-month' : '30-day';
       detail.textContent = expText
-        ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} left · access ends ${expText}. Pay again before then to keep classes and community.`
+        ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} left · access ends ${expText}. Pay or use a new coupon before then for the next period.`
         : `Your ${periodLabel} access is active.`;
     }
 
@@ -262,7 +262,7 @@ const Dashboard = {
     if (warn) {
       if (expiringSoon && daysLeft > 0) {
         const renewLabel = user.class_type === 'individual' ? '6-month course' : 'monthly subscription';
-        warn.textContent = `Your ${renewLabel} is coming to expire in ${daysLeft} day${daysLeft === 1 ? '' : 's'}. Renew on the Payment page so you do not lose access.`;
+        warn.textContent = `Your ${renewLabel} ends in ${daysLeft} day${daysLeft === 1 ? '' : 's'}. Renew on the Payment page (pay or use a new coupon) before access stops.`;
         warn.classList.remove('hidden');
       } else {
         warn.textContent = '';
