@@ -191,7 +191,11 @@
         <button type="submit" class="btn btn-primary btn-block mt-3">Publish</button>
       </form>
       <div class="glass" style="padding:1rem">
-        <h3 class="mb-3">All posts</h3>
+        <div class="flex gap-2 mb-3 flex-wrap" style="align-items:center;justify-content:space-between">
+          <h3 class="mb-0">All posts <span id="admin-community-count" class="opacity-70 text-sm"></span></h3>
+          <button type="button" id="admin-community-refresh" class="btn btn-sm btn-secondary">Refresh</button>
+        </div>
+        <p class="text-sm opacity-70 mb-3">Same feed students see on Community. Pin, edit, or delete any post.</p>
         <div id="admin-community-feed"></div>
       </div>
     </section>

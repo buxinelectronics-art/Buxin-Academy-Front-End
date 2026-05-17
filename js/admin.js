@@ -23,6 +23,7 @@ const Admin = {
     await this.loadStudents();
     await this.loadPayments();
     await this.loadCoupons();
+    void this.loadCommunityPosts();
     await this.loadAdminClasses();
     this.bindTabs();
     this.setupStudentModals();
@@ -156,6 +157,7 @@ const Admin = {
     });
     document.getElementById('coupon-filter-status')?.addEventListener('change', () => this.loadCoupons());
     document.getElementById('coupon-filter-class')?.addEventListener('change', () => this.loadCoupons());
+    document.getElementById('admin-community-refresh')?.addEventListener('click', () => this.loadCommunityPosts());
 
     document.getElementById('create-class-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -609,33 +611,66 @@ const Admin = {
     return html;
   },
 
+  getPostImages(p) {
+    if (p?.image_urls?.length) return p.image_urls;
+    if (p?.image_url) return [p.image_url];
+    return [];
+  },
+
+  renderAdminPostImages(p) {
+    const urls = this.getPostImages(p);
+    if (!urls.length) return '';
+    const cells = urls.map((url) => `
+      <div class="post-image-cell">
+        <img src="${this.escape(url)}" alt="" class="post-image" loading="lazy">
+      </div>`).join('');
+    return `<div class="post-images-grid">${cells}</div>`;
+  },
+
   renderAdminPost(p) {
+    const id = Number(p.id);
+    const adminBadge = p.author_role === 'admin' ? ' <span class="admin-badge">Admin</span>' : '';
+    const comments = (p.comments || [])
+      .map((c) => `<div class="comment-item text-sm"><strong>${this.escape(c.author_name)}</strong>: ${this.escape(c.content)}</div>`)
+      .join('');
     return `
-      <article class="post-card glass mb-3" data-admin-post="${p.id}">
-        <p><strong>${this.escape(p.author_name)}</strong> · <small>${BuxinEV.formatDate(p.created_at)}</small></p>
+      <article class="post-card glass mb-3 ${p.is_pinned ? 'pinned' : ''}" data-admin-post="${id}">
         ${p.is_pinned ? '<span class="pin-badge">📌 Pinned</span> ' : ''}
-        ${p.is_announcement ? '<span class="announce-badge">📢</span> ' : ''}
+        ${p.is_announcement ? '<span class="announce-badge">📢 Announcement</span> ' : ''}
+        <p><strong>${this.escape(p.author_name)}</strong>${adminBadge} · <small>#${id} · ${BuxinEV.formatDate(p.created_at)}</small></p>
         ${this.renderAdminPostBody(p)}
-        ${p.image_url ? `<img src="${p.image_url}" alt="" class="post-image" loading="lazy">` : ''}
+        ${this.renderAdminPostImages(p)}
+        ${p.meet_link || p.zoom_link ? `
+          <div class="flex gap-2 mt-2 flex-wrap">
+            ${p.meet_link ? `<a href="${this.escape(p.meet_link)}" target="_blank" rel="noopener" class="btn btn-sm btn-primary">Meet</a>` : ''}
+            ${p.zoom_link ? `<a href="${this.escape(p.zoom_link)}" target="_blank" rel="noopener" class="btn btn-sm btn-secondary">Zoom</a>` : ''}
+          </div>` : ''}
         <p class="text-sm opacity-70">❤️ ${p.like_count || 0} · 💬 ${p.comment_count || 0}</p>
+        ${comments ? `<div class="comments-list mt-2">${comments}</div>` : ''}
         <div class="flex gap-2 mt-2 flex-wrap">
-          <button type="button" class="btn btn-sm btn-secondary" onclick="Admin.editPost(${p.id})">Edit</button>
-          <button type="button" class="btn btn-sm btn-danger" onclick="Admin.deletePost(${p.id})">Delete</button>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="Admin.editPost(${id})">Edit</button>
+          <button type="button" class="btn btn-sm btn-secondary" onclick="Admin.togglePin(${id}, ${p.is_pinned ? 'true' : 'false'})">${p.is_pinned ? 'Unpin' : 'Pin'}</button>
+          <button type="button" class="btn btn-sm btn-danger" onclick="Admin.deletePost(${id})">Delete</button>
         </div>
       </article>`;
   },
 
   async loadCommunityPosts() {
     const feed = document.getElementById('admin-community-feed');
+    const countEl = document.getElementById('admin-community-count');
     if (!feed) return;
-    feed.innerHTML = '<p class="opacity-70">Loading…</p>';
+    feed.innerHTML = '<p class="opacity-70">Loading posts…</p>';
     try {
-      const { posts } = await BuxinEV.api('/api/community/posts');
+      const data = await BuxinEV.api(`/api/admin/community/posts?_=${Date.now()}`);
+      const posts = Array.isArray(data.posts) ? data.posts : [];
+      if (countEl) countEl.textContent = posts.length ? `(${posts.length})` : '';
       feed.innerHTML = posts.length
         ? posts.map((p) => this.renderAdminPost(p)).join('')
-        : '<p class="opacity-70">No posts yet.</p>';
-    } catch {
-      feed.innerHTML = '<p class="opacity-70">Could not load posts.</p>';
+        : '<p class="opacity-70">No posts in the database yet.</p>';
+    } catch (err) {
+      if (countEl) countEl.textContent = '';
+      const msg = err.error || (err.network ? 'Cannot reach server' : 'Could not load posts');
+      feed.innerHTML = `<p class="error-text">${this.escape(msg)}. Try Refresh or log in again.</p>`;
     }
   },
 
@@ -643,10 +678,23 @@ const Admin = {
     if (!confirm('Delete this post for everyone?')) return;
     try {
       await BuxinEV.api(`/api/community/posts/${id}`, { method: 'DELETE' });
-      document.querySelector(`[data-admin-post="${id}"]`)?.remove();
       BuxinEV.showToast('Post deleted', 'success');
+      await this.loadCommunityPosts();
     } catch (err) {
       BuxinEV.showToast(err.error || 'Delete failed', 'error');
+    }
+  },
+
+  async togglePin(id, currentlyPinned) {
+    try {
+      await BuxinEV.api(`/api/community/posts/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ is_pinned: !currentlyPinned }),
+      });
+      BuxinEV.showToast(currentlyPinned ? 'Unpinned' : 'Pinned to top', 'success');
+      await this.loadCommunityPosts();
+    } catch (err) {
+      BuxinEV.showToast(err.error || 'Could not update pin', 'error');
     }
   },
 
