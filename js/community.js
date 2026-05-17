@@ -3,23 +3,41 @@ const Community = {
   _eventsBound: false,
   _feedLoadGen: 0,
   _feedLoadAbort: null,
-  _previewUrl: null,
-  _compressedBlob: null,
-  _compressing: false,
+  _previewUrls: [],
+  MAX_POST_IMAGES: 5,
   _commenting: new Set(),
   _liking: new Set(),
   _lastLocalPostAt: 0,
 
-  buildOptimisticPost({ id, content, imageUrl, youtubeId }) {
+  getPostImages(p) {
+    if (p?.image_urls?.length) return p.image_urls;
+    if (p?.image_url) return [p.image_url];
+    return [];
+  },
+
+  renderPostImages(p, syncing = false) {
+    const urls = this.getPostImages(p);
+    if (!urls.length) return '';
+    const cells = urls.map((url) => `
+      <div class="post-image-cell">
+        <img src="${url}" alt="" class="post-image" loading="lazy">
+        ${syncing ? '<span class="media-spinner" aria-label="Saving"></span>' : ''}
+      </div>`).join('');
+    return `<div class="post-images-grid">${cells}</div>`;
+  },
+
+  buildOptimisticPost({ id, content, imageUrls, youtubeId }) {
     const user = Auth.getUser();
+    const urls = imageUrls || [];
     return {
       id,
       _optimistic: true,
       user_id: user?.id,
       author_name: user?.full_name || 'You',
       author_role: user?.role || 'student',
-      content: content || (imageUrl ? '📷' : '') || (youtubeId ? '🎬' : ''),
-      image_url: imageUrl || null,
+      content: content || (urls.length ? '📷' : '') || (youtubeId ? '🎬' : ''),
+      image_url: urls[0] || null,
+      image_urls: urls,
       youtube_video_id: youtubeId || null,
       like_count: 0,
       liked: false,
@@ -159,10 +177,7 @@ const Community = {
     });
 
     document.getElementById('post-image')?.addEventListener('change', (e) => {
-      const file = e.target.files?.[0];
-      this.setImagePreview(file);
-      this._compressedBlob = null;
-      if (file) void this.prepareImageInBackground(file);
+      this.setImagesPreview(e.target.files);
     });
 
     document.getElementById('post-content')?.addEventListener('input', (e) => {
@@ -200,21 +215,33 @@ const Community = {
     this._feedLoadAbort = null;
   },
 
-  setImagePreview(file) {
-    const preview = document.getElementById('post-image-preview');
-    if (!preview) return;
-    if (this._previewUrl) {
-      URL.revokeObjectURL(this._previewUrl);
-      this._previewUrl = null;
+  revokePreviewUrls() {
+    this._previewUrls.forEach((u) => URL.revokeObjectURL(u));
+    this._previewUrls = [];
+  },
+
+  setImagesPreview(fileList) {
+    const wrap = document.getElementById('post-images-preview');
+    if (!wrap) return;
+    this.revokePreviewUrls();
+    const files = [...(fileList || [])].filter((f) => f && BuxinEV.isImageFile(f)).slice(0, this.MAX_POST_IMAGES);
+    if (!files.length) {
+      wrap.innerHTML = '';
+      wrap.classList.add('hidden');
+      wrap.setAttribute('aria-hidden', 'true');
+      return;
     }
-    if (file) {
-      this._previewUrl = URL.createObjectURL(file);
-      preview.src = this._previewUrl;
-      preview.classList.remove('hidden');
-    } else {
-      preview.removeAttribute('src');
-      preview.classList.add('hidden');
+    if ((fileList?.length || 0) > this.MAX_POST_IMAGES) {
+      BuxinEV.showToast(`Only the first ${this.MAX_POST_IMAGES} photos are used`, 'info');
     }
+    this._previewUrls = files.map((f) => URL.createObjectURL(f));
+    wrap.className = 'post-images-preview post-images-grid';
+    wrap.innerHTML = this._previewUrls.map((url) => `
+      <div class="post-image-cell post-image-cell--preview">
+        <img src="${url}" alt="" class="post-image">
+      </div>`).join('');
+    wrap.classList.remove('hidden');
+    wrap.removeAttribute('aria-hidden');
   },
 
   setVideoPreview(videoId) {
@@ -252,27 +279,18 @@ const Community = {
     this.setUploadStatus('');
   },
 
-  async prepareImageInBackground(file) {
-    if (this._compressing) return;
-    this._compressing = true;
-    try {
-      this._compressedBlob = await BuxinEV.compressImageToBlob(file);
-      this.setUploadStatus('Photo ready to post');
-    } catch {
-      this._compressedBlob = null;
-    } finally {
-      this._compressing = false;
-    }
-  },
-
   clearPostForm() {
     const form = document.getElementById('post-form');
     form?.reset();
     const imgInput = document.getElementById('post-image');
     if (imgInput) imgInput.value = '';
-    this.setImagePreview(null);
+    this.revokePreviewUrls();
+    const wrap = document.getElementById('post-images-preview');
+    if (wrap) {
+      wrap.innerHTML = '';
+      wrap.classList.add('hidden');
+    }
     this.setVideoPreview(null);
-    this._compressedBlob = null;
     this.setUploadStatus('');
     form?.classList.remove('is-submitting');
   },
@@ -303,22 +321,23 @@ const Community = {
 
     const contentEl = document.getElementById('post-content');
     const content = contentEl?.value.trim() || '';
-    const file = document.getElementById('post-image')?.files?.[0];
+    const input = document.getElementById('post-image');
+    const files = [...(input?.files || [])].filter((f) => BuxinEV.isImageFile(f)).slice(0, this.MAX_POST_IMAGES);
     const youtubeId = this.parseYouTubeId(content);
-    if (!content && !file && !youtubeId) {
-      BuxinEV.showToast('Write a message, paste a YouTube link, or add a photo', 'error');
+    if (!content && !files.length && !youtubeId) {
+      BuxinEV.showToast('Write a message, paste a YouTube link, or add photos', 'error');
       return;
     }
 
     const pendingId = `pending-${Date.now()}`;
-    const localPreviewUrl = file ? URL.createObjectURL(file) : null;
+    const localPreviewUrls = files.map((f) => URL.createObjectURL(f));
     const savedContent = content;
-    const savedFile = file;
+    const savedFiles = files;
 
     const optimistic = this.buildOptimisticPost({
       id: pendingId,
       content,
-      imageUrl: localPreviewUrl,
+      imageUrls: localPreviewUrls,
       youtubeId,
     });
     this._lastLocalPostAt = Date.now();
@@ -328,15 +347,13 @@ const Community = {
     void (async () => {
       try {
         let result;
-        if (savedFile) {
-          let blob = this._compressedBlob;
-          if (!blob) {
-            blob = await BuxinEV.compressImageToBlob(savedFile);
-            this._compressedBlob = blob;
-          }
+        if (savedFiles.length) {
           const fd = new FormData();
           fd.append('content', savedContent);
-          fd.append('image', blob, 'photo.jpg');
+          for (let i = 0; i < savedFiles.length; i++) {
+            const blob = await BuxinEV.compressImageToBlob(savedFiles[i]);
+            fd.append('images', blob, `photo-${i}.jpg`);
+          }
           result = await BuxinEV.apiMultipart('/api/community/posts', fd);
         } else {
           result = await BuxinEV.api('/api/community/posts', {
@@ -353,7 +370,7 @@ const Community = {
         this.removeOptimisticPost(pendingId);
         BuxinEV.showToast(err.error || 'Post did not save — refresh and try again', 'error');
       } finally {
-        if (localPreviewUrl) URL.revokeObjectURL(localPreviewUrl);
+        localPreviewUrls.forEach((u) => URL.revokeObjectURL(u));
       }
     })();
   },
@@ -430,7 +447,15 @@ const Community = {
   },
 
   renderComment(c) {
-    return `<div class="comment-item" data-comment-id="${c.id}"><strong>${this.escape(c.author_name)}</strong> <small>${BuxinEV.formatDate(c.created_at)}</small><p>${this.escape(c.content)}</p></div>`;
+    const pending = c._pending || String(c.id).startsWith('comment-pending-');
+    return `<div class="comment-item${pending ? ' comment-pending' : ''}" data-comment-id="${c.id}">
+      <div class="comment-item__head">
+        <strong>${this.escape(c.author_name)}</strong>
+        <small>${pending ? 'Just now' : BuxinEV.formatDate(c.created_at)}</small>
+        ${pending ? '<span class="media-spinner media-spinner--sm" aria-label="Saving"></span>' : ''}
+      </div>
+      <p>${this.escape(c.content)}</p>
+    </div>`;
   },
 
   renderPost(p, user) {
@@ -449,11 +474,11 @@ const Community = {
           <div class="avatar-sm">${p.author_name?.[0] || '?'}</div>
           <div>
             <strong>${this.escape(p.author_name)}</strong>${adminBadge}
-            <small>${timeLabel}${syncing ? ' <span class="sync-pill">Saving</span>' : ''}</small>
+            <small>${timeLabel}</small>
           </div>
         </header>
         ${this.renderPostBody(p)}
-        ${p.image_url ? `<img src="${p.image_url}" alt="Post" class="post-image" loading="lazy">` : ''}
+        ${this.renderPostImages(p, syncing)}
         ${p.meet_link || p.zoom_link ? `
           <div class="flex gap-2 mt-2 flex-wrap">
             ${p.meet_link ? `<a href="${p.meet_link}" target="_blank" rel="noopener" class="btn btn-sm btn-primary">Join Meet</a>` : ''}
@@ -514,9 +539,7 @@ const Community = {
   },
 
   submitComment(postId) {
-    const id = String(postId);
     if (String(postId).startsWith('pending-')) return;
-    if (this._commenting.has(id)) return;
 
     const input = document.querySelector(`[data-comment-input="${postId}"]`);
     const content = input?.value.trim();
@@ -531,12 +554,12 @@ const Community = {
     input.value = '';
     this.appendCommentToPost(postId, {
       id: tempId,
+      _pending: true,
       author_name: user?.full_name || 'You',
       content,
       created_at: new Date().toISOString(),
     });
 
-    this._commenting.add(id);
     void (async () => {
       try {
         const { comment } = await BuxinEV.api(`/api/community/posts/${postId}/comment`, {
@@ -557,8 +580,6 @@ const Community = {
         }
         input.value = content;
         BuxinEV.showToast(err.error || 'Comment did not save', 'error');
-      } finally {
-        this._commenting.delete(id);
       }
     })();
   },

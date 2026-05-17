@@ -32,11 +32,10 @@
       <textarea id="post-content" class="input" rows="3" placeholder="Write a message, paste a YouTube link, or add a photo…"></textarea>
       <div id="post-video-preview" class="post-video-preview hidden" aria-hidden="true"></div>
       <div class="form-group mt-2">
-        <label class="text-sm opacity-70">Photo (optional)</label>
-        <input type="file" id="post-image" accept="image/*" class="input">
-        <img id="post-image-preview" class="hidden post-image-preview mt-2" alt="Preview">
+        <label class="text-sm opacity-70">Photos (optional, up to 5)</label>
+        <input type="file" id="post-image" accept="image/*" multiple class="input">
+        <div id="post-images-preview" class="post-images-preview hidden" aria-hidden="true"></div>
       </div>
-      <p id="post-upload-status" class="post-upload-status hidden" aria-live="polite"></p>
       <button type="submit" class="btn btn-primary mt-2" id="post-submit-btn">Post</button>
     </form>
 
