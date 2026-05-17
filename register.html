@@ -22,7 +22,13 @@
         <label>Class Type</label>
         <select id="class_type">
           <option value="group">Group Class (Sundays)</option>
-          <option value="individual">Individual Mentorship</option>
+          <option value="individual">Individual Mentorship (6 months)</option>
+        </select>
+      </div>
+      <div id="individual-course-wrap" class="form-group hidden">
+        <label>6-month course track *</label>
+        <select id="selected_course">
+          <option value="">Loading courses…</option>
         </select>
       </div>
       <button type="submit" class="btn btn-primary btn-block">Continue to Payment</button>
@@ -32,25 +38,39 @@
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/courses.js"></script>
   <script>
     if (!localStorage.getItem('buxinev_country')) location.href = 'index.html';
+    const classTypeEl = document.getElementById('class_type');
+    const courseWrap = document.getElementById('individual-course-wrap');
+    const courseSel = document.getElementById('selected_course');
+    function syncCourseField() {
+      const isIndividual = classTypeEl.value === 'individual';
+      courseWrap.classList.toggle('hidden', !isIndividual);
+      courseSel.required = isIndividual;
+    }
+    void Courses.load().then(() => Courses.fillSelect(courseSel));
+    classTypeEl.addEventListener('change', syncCourseField);
     const params = new URLSearchParams(location.search);
-    if (params.get('type')) document.getElementById('class_type').value = params.get('type');
+    if (params.get('type')) classTypeEl.value = params.get('type');
+    syncCourseField();
     document.getElementById('register-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const btn = e.target.querySelector('[type=submit]');
       btn.disabled = true;
       try {
-        const user = await Auth.register({
+        const type = classTypeEl.value;
+        const payload = {
           full_name: document.getElementById('full_name').value,
           email: document.getElementById('email').value,
           phone: document.getElementById('phone').value,
           city: document.getElementById('city').value,
           password: document.getElementById('password').value,
           ...BuxinEV.getRegistrationCountry(),
-          class_type: document.getElementById('class_type').value,
-        });
-        const type = document.getElementById('class_type').value;
+          class_type: type,
+        };
+        if (type === 'individual') payload.selected_course = courseSel.value;
+        await Auth.register(payload);
         location.href = type === 'individual' ? 'individual-class.html?step=schedule' : `payment.html?type=${type}`;
       } catch (err) {
         BuxinEV.showToast(err.error || 'Registration failed', 'error');

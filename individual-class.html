@@ -12,8 +12,8 @@
 
   <main class="container" style="padding:2rem 1rem;max-width:640px">
     <span class="hero-badge">One-on-One Mentorship</span>
-    <h1>Individual Robotics Class</h1>
-    <p class="opacity-70 mb-2"><strong data-price-individual>D7,250.00</strong> · Flexible schedule</p>
+    <h1>Individual Mentorship</h1>
+    <p class="opacity-70 mb-2"><strong data-price-individual>D7,250.00</strong> · 6-month program · Flexible schedule</p>
 
     <section id="register-section" class="glass" style="padding:1.5rem;margin-top:1rem">
       <h2 class="mb-4">Step 1 — Register</h2>
@@ -24,6 +24,12 @@
         <div class="form-group"><label>City *</label><input type="text" name="city" required></div>
         <div class="form-group"><label>Password *</label><input type="password" name="password" required minlength="6"></div>
         <div class="form-group">
+          <label>6-month course track *</label>
+          <select name="selected_course" id="register-course" required>
+            <option value="">Loading courses…</option>
+          </select>
+        </div>
+        <div class="form-group">
           <label>Experience Level</label>
           <select name="experience_level"><option>Beginner</option><option>Intermediate</option><option>Advanced</option></select>
         </div>
@@ -33,6 +39,11 @@
     </section>
 
     <section id="schedule-section" class="glass hidden" style="padding:1.5rem;margin-top:1rem">
+      <div id="schedule-course-wrap" class="form-group hidden">
+        <label>6-month course track *</label>
+        <select id="schedule-course-select"></select>
+        <p class="text-sm opacity-70 mt-1">Choose the program you will follow for six months.</p>
+      </div>
       <h2>Step 2 — Pick your 2 weekly class times (IST)</h2>
       <div id="schedule-rules" class="schedule-rules mb-3"></div>
       <p id="schedule-selection-hint" class="text-sm mb-3">Selected 0 of 2 required slots</p>
@@ -44,14 +55,31 @@
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/auth.js"></script>
+  <script src="js/courses.js"></script>
   <script src="js/schedule.js"></script>
   <script>
     if (!localStorage.getItem('buxinev_country')) location.href = 'index.html';
-    const params = new URLSearchParams(location.search);
-    if (params.get('step') === 'schedule' && Auth.isLoggedIn()) {
+    void Courses.load().then(() => {
+      Courses.fillSelect(document.getElementById('register-course'));
+    });
+    async function prepareScheduleStep() {
       document.getElementById('register-section').classList.add('hidden');
       document.getElementById('schedule-section').classList.remove('hidden');
+      await Courses.load();
+      const user = Auth.getUser();
+      const wrap = document.getElementById('schedule-course-wrap');
+      const sel = document.getElementById('schedule-course-select');
+      if (user && !user.selected_course && wrap && sel) {
+        wrap.classList.remove('hidden');
+        Courses.fillSelect(sel);
+      } else if (wrap) {
+        wrap.classList.add('hidden');
+      }
       SchedulePicker.init();
+    }
+    const params = new URLSearchParams(location.search);
+    if (params.get('step') === 'schedule' && Auth.isLoggedIn()) {
+      void prepareScheduleStep();
     }
     document.getElementById('individual-register-form').addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -64,11 +92,10 @@
           full_name: fd.get('full_name'), email, phone: fd.get('phone'),
           city: fd.get('city'), password: fd.get('password'),
           ...BuxinEV.getRegistrationCountry(), class_type: 'individual',
+          selected_course: fd.get('selected_course'),
           experience_level: fd.get('experience_level'), learning_goals: fd.get('learning_goals'),
         });
-        document.getElementById('register-section').classList.add('hidden');
-        document.getElementById('schedule-section').classList.remove('hidden');
-        SchedulePicker.init();
+        await prepareScheduleStep();
       } catch (err) {
         if (!Auth.handleRegisterError(err, email, 'individual')) {
           BuxinEV.showToast(err.error || 'Failed', 'error');
@@ -78,6 +105,28 @@
     });
     document.getElementById('schedule-continue').addEventListener('click', async () => {
       if (!Auth.isLoggedIn()) { location.href = 'individual-class.html'; return; }
+      const wrap = document.getElementById('schedule-course-wrap');
+      const sel = document.getElementById('schedule-course-select');
+      if (wrap && !wrap.classList.contains('hidden') && sel?.value) {
+        try {
+          const { user } = await BuxinEV.api('/api/auth/me', {
+            method: 'PATCH',
+            body: JSON.stringify({ selected_course: sel.value }),
+          });
+          Auth.setUser(user);
+        } catch (err) {
+          BuxinEV.showToast(err.error || 'Please select your course', 'error');
+          return;
+        }
+      } else if (wrap && !wrap.classList.contains('hidden') && !sel?.value) {
+        BuxinEV.showToast('Please select your 6-month course track', 'error');
+        return;
+      }
+      const user = Auth.getUser();
+      if (!user?.selected_course) {
+        BuxinEV.showToast('Please select your 6-month course track', 'error');
+        return;
+      }
       const ok = await SchedulePicker.saveSelections();
       if (ok) location.href = 'payment.html?type=individual';
     });

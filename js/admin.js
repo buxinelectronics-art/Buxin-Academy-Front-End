@@ -16,6 +16,8 @@ const Admin = {
 
   async init() {
     if (!Auth.requireAuth() || !Auth.requireAdmin()) return;
+    await Courses.load();
+    this.populateCourseFilters();
     await this.loadStats();
     await this.loadClassPeriodPanel();
     await this.loadStudents();
@@ -24,6 +26,25 @@ const Admin = {
     this.bindTabs();
     this.setupStudentModals();
     this.bindActions();
+  },
+
+  populateCourseFilters() {
+    const filter = document.getElementById('filter-course');
+    const list = Courses._list || Courses.FALLBACK;
+    if (filter) {
+      const current = filter.value;
+      filter.innerHTML = '<option value="">All courses</option>'
+        + list.map((c) => `<option value="${c.id}">${c.name}</option>`).join('');
+      filter.value = current || '';
+    }
+    const editSel = document.getElementById('edit-selected_course');
+    if (editSel) Courses.fillSelect(editSel);
+  },
+
+  syncEditCourseField() {
+    const wrap = document.getElementById('edit-course-wrap');
+    const isIndividual = document.getElementById('edit-class_type')?.value === 'individual';
+    wrap?.classList.toggle('hidden', !isIndividual);
   },
 
   bindTabs() {
@@ -67,6 +88,9 @@ const Admin = {
         learning_goals: fd.get('learning_goals') || '',
         status: fd.get('status'),
       };
+      if (body.class_type === 'individual') {
+        body.selected_course = fd.get('selected_course') || '';
+      }
       const np = fd.get('new_password');
       if (np && String(np).trim()) body.new_password = String(np).trim();
       try {
@@ -92,6 +116,8 @@ const Admin = {
     document.getElementById('filter-country')?.addEventListener('change', () => this.loadStudents());
     document.getElementById('filter-status')?.addEventListener('change', () => this.loadStudents());
     document.getElementById('filter-class')?.addEventListener('change', () => this.loadStudents());
+    document.getElementById('filter-course')?.addEventListener('change', () => this.loadStudents());
+    document.getElementById('edit-class_type')?.addEventListener('change', () => this.syncEditCourseField());
 
     document.getElementById('payment-filter')?.addEventListener('change', () => this.loadPayments());
     document.getElementById('payment-country-filter')?.addEventListener('change', () => this.loadPayments());
@@ -233,15 +259,15 @@ const Admin = {
           ? BuxinEV.formatDate(data.class_period_started_at)
           : '';
         statusEl.textContent = when
-          ? `Class period is live since ${when}. Day 1–30 is counting for enrolled students.`
-          : 'Class period is live. Day 1–30 is counting for enrolled students.';
+          ? `Class period is live since ${when}. Progress is counting (30 days group · 180 days individual).`
+          : 'Class period is live. Progress is counting (30 days group · 180 days individual).';
         btn.disabled = true;
         btn.textContent = 'Class period started';
         btn.classList.remove('btn-primary');
         btn.classList.add('btn-secondary');
         if (waitingEl) waitingEl.classList.add('hidden');
       } else {
-        statusEl.textContent = 'Registration is open. The 30-day progress bar has not started yet.';
+        statusEl.textContent = 'Registration is open. Progress bars have not started yet.';
         const n = data.students_waiting_start ?? 0;
         if (waitingEl) {
           waitingEl.textContent = n
@@ -261,8 +287,8 @@ const Admin = {
     const btn = document.getElementById('start-class-period-btn');
     if (!btn || btn.disabled) return;
     if (!confirm(
-      'Start the 30-day class period for ALL active students now?\n\n'
-      + 'Day 1 will begin today. Students who register after this still get their own 30 days when you approve payment.',
+      'Start the class period for ALL active students now?\n\n'
+      + 'Day 1 begins today. Group students run 30 days; individual students run 180 days (6 months) per payment.',
     )) return;
     btn.disabled = true;
     try {
@@ -285,6 +311,7 @@ const Admin = {
     const country = document.getElementById('filter-country')?.value || '';
     const status = document.getElementById('filter-status')?.value || '';
     const classType = document.getElementById('filter-class')?.value || '';
+    const courseId = document.getElementById('filter-course')?.value || '';
     const params = new URLSearchParams();
     if (search || document.getElementById('student-search')?.value) {
       params.set('search', search || document.getElementById('student-search').value);
@@ -292,6 +319,7 @@ const Admin = {
     if (country) params.set('country', country);
     if (status) params.set('status', status);
     if (classType) params.set('class_type', classType);
+    if (courseId) params.set('selected_course', courseId);
     try {
       const { students } = await BuxinEV.api(`/api/admin/students?${params}`);
       const tbody = document.getElementById('students-table');
@@ -306,6 +334,7 @@ const Admin = {
           <td data-label="Email">${s.email}</td>
           <td data-label="Country">${BuxinEV.formatUserCountry(s)}</td>
           <td data-label="Class">${this.classLabel(s.class_type)}</td>
+          <td data-label="Course">${s.class_type === 'individual' ? (s.selected_course_name || '—') : '—'}</td>
           <td data-label="Status"><span class="status-badge status-${s.status}">${s.status}</span></td>
           <td data-label="Date">${BuxinEV.formatDate(s.created_at)}</td>
           <td data-label="Actions">
@@ -314,7 +343,7 @@ const Admin = {
             <button type="button" class="btn btn-sm btn-danger" onclick="Admin.deleteStudent(${s.id})">Delete</button>
           </td>
         </tr>`;
-      }).join('') || '<tr><td colspan="8">No students found</td></tr>';
+      }).join('') || '<tr><td colspan="9">No students found</td></tr>';
     } catch { /* silent */ }
   },
 
@@ -376,6 +405,7 @@ const Admin = {
           <div class="student-detail-row"><dt>City</dt><dd>${esc(student.city) || '—'}</dd></div>
           <div class="student-detail-row"><dt>Country</dt><dd>${countryLabel}</dd></div>
           <div class="student-detail-row"><dt>Class</dt><dd>${this.classLabel(student.class_type)}</dd></div>
+          <div class="student-detail-row"><dt>Course</dt><dd>${student.class_type === 'individual' ? esc(student.selected_course_name || '—') : '—'}</dd></div>
           <div class="student-detail-row"><dt>Experience</dt><dd>${esc(student.experience_level) || '—'}</dd></div>
           <div class="student-detail-row"><dt>Goals</dt><dd>${esc(student.learning_goals) || '—'}</dd></div>
           <div class="student-detail-row"><dt>Status</dt><dd><span class="status-badge status-${student.status}">${esc(student.status)}</span></dd></div>
@@ -397,6 +427,8 @@ const Admin = {
       document.getElementById('edit-city').value = student.city || '';
       document.getElementById('edit-country_code').value = student.country_code || '';
       document.getElementById('edit-class_type').value = student.class_type || 'group';
+      Courses.fillSelect(document.getElementById('edit-selected_course'), student.selected_course || '');
+      this.syncEditCourseField();
       document.getElementById('edit-experience_level').value = student.experience_level || '';
       document.getElementById('edit-learning_goals').value = student.learning_goals || '';
       document.getElementById('edit-status').value = student.status || 'pending';

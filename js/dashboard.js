@@ -155,11 +155,17 @@ const Dashboard = {
 
     set('user-class', user.class_type === 'individual'
 
-      ? 'Individual Mentorship'
+      ? 'Individual Mentorship (6 months)'
 
       : 'Group Class (Sundays)');
 
-
+    const courseRow = document.getElementById('user-course-row');
+    if (user.class_type === 'individual') {
+      courseRow?.classList.remove('hidden');
+      set('user-course', user.selected_course_name || '—');
+    } else {
+      courseRow?.classList.add('hidden');
+    }
 
     const avatar = document.getElementById('user-avatar');
 
@@ -189,13 +195,22 @@ const Dashboard = {
     const awaitingEl = document.getElementById('subscription-awaiting-msg');
     const renew = document.getElementById('subscription-renew-link');
 
+    const isIndividual = user.class_type === 'individual';
+    const totalDays = user.subscription_days_total || (isIndividual ? 180 : 30);
+    const titleEl = document.getElementById('subscription-card-title');
+    if (titleEl) {
+      titleEl.textContent = isIndividual ? '6-month course access' : 'Monthly subscription';
+    }
+
     if (user.awaiting_class_start) {
       card.classList.remove('subscription-card--warning');
       const dayLabel = document.getElementById('subscription-day-label');
       if (dayLabel) dayLabel.textContent = 'Class period not started yet';
       if (progressWrap) progressWrap.classList.add('hidden');
       if (awaitingEl) {
-        awaitingEl.textContent = 'You have full access to the community now. Day 1 of 30 starts when your instructor begins the class period.';
+        awaitingEl.textContent = isIndividual
+          ? `You have full access to the community now. Day 1 of ${totalDays} starts when your instructor begins the class period.`
+          : 'You have full access to the community now. Day 1 of 30 starts when your instructor begins the class period.';
         awaitingEl.classList.remove('hidden');
       }
       const detail = document.getElementById('subscription-status');
@@ -213,7 +228,7 @@ const Dashboard = {
       return;
     }
 
-    const total = user.subscription_days_total || 30;
+    const total = user.subscription_days_total || (user.class_type === 'individual' ? 180 : 30);
     const day = user.subscription_day || 1;
     const daysLeft = user.subscription_days_left ?? 0;
     const exp = user.subscription_expires_at ? new Date(user.subscription_expires_at) : null;
@@ -237,15 +252,17 @@ const Dashboard = {
     const detail = document.getElementById('subscription-status');
     if (detail) {
       const expText = exp ? exp.toLocaleDateString(undefined, { dateStyle: 'medium' }) : '';
+      const periodLabel = user.class_type === 'individual' ? '6-month' : '30-day';
       detail.textContent = expText
         ? `${daysLeft} day${daysLeft === 1 ? '' : 's'} left · access ends ${expText}. Pay again before then to keep classes and community.`
-        : 'Your 30-day access is active.';
+        : `Your ${periodLabel} access is active.`;
     }
 
     const warn = document.getElementById('subscription-expiry-warning');
     if (warn) {
       if (expiringSoon && daysLeft > 0) {
-        warn.textContent = `Your monthly subscription is coming to expire in ${daysLeft} day${daysLeft === 1 ? '' : 's'}. Renew on the Payment page so you do not lose access.`;
+        const renewLabel = user.class_type === 'individual' ? '6-month course' : 'monthly subscription';
+        warn.textContent = `Your ${renewLabel} is coming to expire in ${daysLeft} day${daysLeft === 1 ? '' : 's'}. Renew on the Payment page so you do not lose access.`;
         warn.classList.remove('hidden');
       } else {
         warn.textContent = '';

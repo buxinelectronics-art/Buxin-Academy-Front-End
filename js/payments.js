@@ -603,13 +603,20 @@ const Payments = {
     const typeEl = document.getElementById('class-type-label');
 
     if (typeEl) {
-
       typeEl.textContent = classType === 'individual'
-
-        ? 'Individual Mentorship Class'
-
+        ? 'Individual Mentorship · 6-month program'
         : 'Group Robotics Class (Sundays)';
+    }
 
+    const courseEl = document.getElementById('payment-course-label');
+    if (courseEl) {
+      if (classType === 'individual' && user?.selected_course_name) {
+        courseEl.textContent = `Course: ${user.selected_course_name}`;
+        courseEl.classList.remove('hidden');
+      } else {
+        courseEl.textContent = '';
+        courseEl.classList.add('hidden');
+      }
     }
 
 
