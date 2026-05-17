@@ -25,6 +25,10 @@
           <option value="individual">Individual Mentorship (6 months)</option>
         </select>
       </div>
+      <div class="form-group">
+        <label>Coupon code <span class="opacity-60">(optional)</span></label>
+        <input type="text" id="register-coupon" class="input" placeholder="Apply on payment page" style="text-transform:uppercase">
+      </div>
       <div id="individual-course-wrap" class="form-group hidden">
         <label>6-month course track *</label>
         <select id="selected_course">
@@ -70,6 +74,8 @@
           class_type: type,
         };
         if (type === 'individual') payload.selected_course = courseSel.value;
+        const coupon = document.getElementById('register-coupon')?.value?.trim();
+        if (coupon) sessionStorage.setItem('buxinev_coupon', coupon.toUpperCase());
         await Auth.register(payload);
         location.href = type === 'individual' ? 'individual-class.html?step=schedule' : `payment.html?type=${type}`;
       } catch (err) {

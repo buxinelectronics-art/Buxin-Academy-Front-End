@@ -33,6 +33,7 @@
 
     <div class="admin-tabs">
       <button class="active" data-tab="panel-payments">Payments</button>
+      <button data-tab="panel-coupons">Coupons</button>
       <button data-tab="panel-students">Students</button>
       <button data-tab="panel-classes">Classes</button>
       <button data-tab="panel-schedules">Schedules</button>
@@ -69,6 +70,61 @@
             </tr>
           </thead>
           <tbody id="payments-table"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="panel-coupons" class="hidden">
+      <div class="glass mb-4" style="padding:1.5rem;max-width:520px">
+        <h3 class="mb-3">Create coupon</h3>
+        <p class="text-sm opacity-70 mb-3">Each code works once. Group coupons only work for group class checkout; individual coupons only for individual.</p>
+        <form id="create-coupon-form">
+          <div class="form-group">
+            <label>Code <span class="opacity-60">(leave blank to auto-generate)</span></label>
+            <input name="code" class="input" placeholder="e.g. BUXIN-FREE-2026" style="text-transform:uppercase">
+          </div>
+          <div class="form-group">
+            <label>Class type</label>
+            <select name="class_type" class="input" required>
+              <option value="group">Group class</option>
+              <option value="individual">Individual class</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Discount</label>
+            <select name="discount_percent" class="input" required>
+              <option value="100">100% — Free (full access, no payment)</option>
+              <option value="75">75% off</option>
+              <option value="50">50% off</option>
+              <option value="25">25% off</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Notes <span class="opacity-60">(optional)</span></label>
+            <input name="notes" class="input" placeholder="Student name or reason">
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Create coupon</button>
+        </form>
+        <p id="coupon-created-banner" class="text-sm mt-3 hidden" style="color:var(--accent)"></p>
+      </div>
+      <div class="flex gap-2 mb-3 flex-wrap">
+        <select id="coupon-filter-status" class="input" style="width:auto;margin:0">
+          <option value="">All</option>
+          <option value="available">Available</option>
+          <option value="used">Used</option>
+        </select>
+        <select id="coupon-filter-class" class="input" style="width:auto;margin:0">
+          <option value="">All classes</option>
+          <option value="group">Group</option>
+          <option value="individual">Individual</option>
+        </select>
+      </div>
+      <div class="table-wrap glass" style="padding:1rem">
+        <table>
+          <thead>
+            <tr><th>Code</th><th>Class</th><th>Discount</th><th>Status</th><th>Used by</th><th>Created</th></tr>
+          </thead>
+          <tbody id="coupons-table"></tbody>
         </table>
       </div>
     </section>

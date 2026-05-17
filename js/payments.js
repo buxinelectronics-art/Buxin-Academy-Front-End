@@ -8,6 +8,10 @@ const Payments = {
 
   _classType: 'group',
 
+  _basePrice: null,
+
+  _appliedPayment: null,
+
 
 
   TIERS: {
@@ -480,6 +484,97 @@ const Payments = {
 
 
 
+  formatPaymentAmount(payment) {
+    if (!payment) return '—';
+    const currency = payment.currency || BuxinEV.getCountry()?.currency || 'GMD';
+    const amount = Number(payment.amount_local ?? 0);
+    if (currency === 'USD') return `$${amount.toFixed(2)}`;
+    const sym = BuxinEV.getCountry()?.symbol || '';
+    const formatted = amount >= 1000
+      ? amount.toLocaleString(undefined, { maximumFractionDigits: 0 })
+      : amount.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    return sym ? `${sym}${formatted}` : `${currency} ${formatted}`;
+  },
+
+  updateAmountFromCouponResponse(res) {
+    const payment = res.payment;
+    if (!payment) return;
+    this._appliedPayment = payment;
+    const amountEl = document.getElementById('payment-amount');
+    if (amountEl) amountEl.textContent = this.formatPaymentAmount(payment);
+
+    const origEl = document.getElementById('payment-original-amount');
+    const noteEl = document.getElementById('payment-discount-note');
+    const origLocal = res.original_amount_local ?? payment.original_amount_local;
+    const finalLocal = payment.amount_local;
+    if (origEl && origLocal != null && finalLocal != null && Number(origLocal) > Number(finalLocal)) {
+      origEl.textContent = this.formatPaymentAmount({
+        amount_local: origLocal,
+        currency: payment.currency,
+      });
+      origEl.classList.remove('hidden');
+    } else {
+      origEl?.classList.add('hidden');
+    }
+    if (noteEl && payment.discount_percent) {
+      noteEl.textContent = payment.discount_percent >= 100
+        ? '100% off — no payment required'
+        : `${payment.discount_percent}% discount applied`;
+      noteEl.classList.remove('hidden');
+    }
+
+    const hint = document.getElementById('coupon-hint');
+    if (hint && payment.coupon_code) {
+      hint.textContent = `Coupon ${payment.coupon_code} applied.`;
+      hint.classList.remove('hidden');
+    }
+  },
+
+  async applyCoupon(classType) {
+    const input = document.getElementById('coupon-code');
+    const code = (input?.value || '').trim();
+    if (!code) {
+      BuxinEV.showToast('Enter your coupon code', 'error');
+      return;
+    }
+    const btn = document.getElementById('apply-coupon-btn');
+    if (btn) btn.disabled = true;
+    try {
+      sessionStorage.setItem('buxinev_coupon', code.toUpperCase());
+      const res = await BuxinEV.api('/api/payments/apply-coupon', {
+        method: 'POST',
+        body: JSON.stringify({ code, class_type: classType }),
+      });
+      if (res.user) Auth.saveSession(localStorage.getItem('buxinev_token'), res.user);
+      if (res.activated) {
+        sessionStorage.removeItem('buxinev_coupon');
+        document.getElementById('payment-free-notice')?.classList.remove('hidden');
+        document.getElementById('payment-checkout')?.classList.add('hidden');
+        document.getElementById('coupon-block')?.classList.add('hidden');
+        BuxinEV.showToast(res.message || 'Free access granted!', 'success');
+        setTimeout(() => { window.location.replace('dashboard.html'); }, 1200);
+        return;
+      }
+      this.updateAmountFromCouponResponse(res);
+      BuxinEV.showToast(res.message || 'Coupon applied', 'success');
+    } catch (err) {
+      BuxinEV.showToast(err.error || 'Invalid coupon', 'error');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  },
+
+  bindCouponUI(classType) {
+    if (this._couponUiBound) return;
+    this._couponUiBound = true;
+    document.getElementById('apply-coupon-btn')?.addEventListener('click', () => {
+      void this.applyCoupon(classType);
+    });
+    const saved = sessionStorage.getItem('buxinev_coupon');
+    const input = document.getElementById('coupon-code');
+    if (saved && input && !input.value) input.value = saved;
+  },
+
   async handleInstantPay(classType, method, btn) {
 
     if (this._submitting) return;
@@ -598,7 +693,11 @@ const Payments = {
 
 
 
+    this._basePrice = price;
+    this._classType = classType;
     document.getElementById('payment-amount') && (document.getElementById('payment-amount').textContent = price.formatted);
+
+    this.bindCouponUI(classType);
 
     const typeEl = document.getElementById('class-type-label');
 

@@ -22,6 +22,7 @@ const Admin = {
     await this.loadClassPeriodPanel();
     await this.loadStudents();
     await this.loadPayments();
+    await this.loadCoupons();
     await this.loadAdminClasses();
     this.bindTabs();
     this.setupStudentModals();
@@ -56,6 +57,7 @@ const Admin = {
         document.getElementById(tab.dataset.tab)?.classList.remove('hidden');
         if (tab.dataset.tab === 'panel-community') void this.loadCommunityPosts();
         if (tab.dataset.tab === 'panel-classes') void this.loadAdminClasses();
+        if (tab.dataset.tab === 'panel-coupons') void this.loadCoupons();
       });
     });
   },
@@ -124,6 +126,36 @@ const Admin = {
     document.getElementById('payment-class-filter')?.addEventListener('change', () => this.loadPayments());
 
     document.getElementById('start-class-period-btn')?.addEventListener('click', () => this.startClassPeriod());
+
+    document.getElementById('create-coupon-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const body = {
+        class_type: fd.get('class_type'),
+        discount_percent: Number(fd.get('discount_percent')),
+        notes: fd.get('notes') || '',
+      };
+      const code = (fd.get('code') || '').trim();
+      if (code) body.code = code;
+      try {
+        const { coupon } = await BuxinEV.api('/api/admin/coupons', {
+          method: 'POST',
+          body: JSON.stringify(body),
+        });
+        const banner = document.getElementById('coupon-created-banner');
+        if (banner) {
+          banner.textContent = `Created: ${coupon.code} (${coupon.discount_percent}% · ${coupon.class_type})`;
+          banner.classList.remove('hidden');
+        }
+        BuxinEV.showToast(`Coupon ${coupon.code} created`, 'success');
+        e.target.reset();
+        await this.loadCoupons();
+      } catch (err) {
+        BuxinEV.showToast(err.error || 'Could not create coupon', 'error');
+      }
+    });
+    document.getElementById('coupon-filter-status')?.addEventListener('change', () => this.loadCoupons());
+    document.getElementById('coupon-filter-class')?.addEventListener('change', () => this.loadCoupons());
 
     document.getElementById('create-class-form')?.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -347,6 +379,32 @@ const Admin = {
     } catch { /* silent */ }
   },
 
+  async loadCoupons() {
+    const status = document.getElementById('coupon-filter-status')?.value || '';
+    const classType = document.getElementById('coupon-filter-class')?.value || '';
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (classType) params.set('class_type', classType);
+    try {
+      const { coupons } = await BuxinEV.api(`/api/admin/coupons?${params}`);
+      const tbody = document.getElementById('coupons-table');
+      if (!tbody) return;
+      const esc = (t) => String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;');
+      tbody.innerHTML = coupons.map((c) => `
+        <tr>
+          <td data-label="Code"><strong>${esc(c.code)}</strong></td>
+          <td data-label="Class">${this.classLabel(c.class_type)}</td>
+          <td data-label="Discount">${c.discount_percent}%${c.is_full ? ' (free)' : ''}</td>
+          <td data-label="Status">${c.is_used
+            ? '<span class="status-badge status-expired">Used</span>'
+            : '<span class="status-badge status-active">Available</span>'}</td>
+          <td data-label="Used by">${esc(c.used_by_name) || '—'}</td>
+          <td data-label="Created">${esc(BuxinEV.formatDate(c.created_at))}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="6">No coupons yet</td></tr>';
+    } catch { /* silent */ }
+  },
+
   async loadPayments() {
     const status = document.getElementById('payment-filter')?.value || '';
     const country = document.getElementById('payment-country-filter')?.value || '';
@@ -365,7 +423,7 @@ const Admin = {
           <td data-label="Email">${p.email}</td>
           <td data-label="Class">${this.classLabel(p.class_type)}</td>
           <td data-label="Country">${p.country_code}</td>
-          <td data-label="Method">${p.payment_method || '—'}</td>
+          <td data-label="Method">${p.payment_method || '—'}${p.coupon_code ? `<br><span class="text-sm opacity-70">${p.coupon_code}</span>` : ''}</td>
           <td data-label="Receipt">${this.receiptCell(p.receipt_url)}</td>
           <td data-label="Status"><span class="status-badge status-${p.status}">${p.status}</span></td>
           <td data-label="Date">${BuxinEV.formatDate(p.created_at)}</td>

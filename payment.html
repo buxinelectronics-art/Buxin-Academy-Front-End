@@ -30,7 +30,22 @@
     <p id="class-type-label" class="opacity-70">Group Robotics Class</p>
     <p id="payment-course-label" class="text-sm opacity-70 hidden"></p>
     <p class="payment-amount" id="payment-amount">?</p>
+    <p id="payment-original-amount" class="text-sm opacity-60 hidden" style="text-decoration:line-through"></p>
+    <p id="payment-discount-note" class="text-sm hidden" style="color:var(--accent)"></p>
+
+    <div id="coupon-block" class="glass mb-4" style="padding:1rem">
+      <label class="text-sm" for="coupon-code"><strong>Have a coupon?</strong></label>
+      <div class="flex gap-2 mt-2 flex-wrap" style="align-items:flex-end">
+        <input type="text" id="coupon-code" class="input" placeholder="Enter code" style="flex:1;min-width:160px;margin:0;text-transform:uppercase" autocomplete="off">
+        <button type="button" id="apply-coupon-btn" class="btn btn-secondary">Apply</button>
+      </div>
+      <p id="coupon-hint" class="text-sm opacity-70 mt-2 hidden"></p>
+    </div>
+
     <p id="payment-intro" class="text-sm text-center opacity-70 mb-4">Choose how you want to pay</p>
+    <section id="payment-free-notice" class="glass hidden" style="padding:1rem;margin-bottom:1rem;border-left:3px solid var(--success,#22c55e)">
+      <p class="text-sm"><strong>Free access unlocked.</strong> Your coupon was applied. Redirecting to your dashboard…</p>
+    </section>
 
     <section id="payment-history" class="hidden">
       <div id="payment-history-list"></div>

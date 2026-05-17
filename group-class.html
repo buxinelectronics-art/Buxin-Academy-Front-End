@@ -52,7 +52,17 @@
       <hr style="border-color:var(--border);margin:1.5rem 0">
 
       <h2 class="text-sm mb-3" style="color:var(--primary)">Payment</h2>
-      <p class="payment-amount" data-price-group style="font-size:1.75rem;margin-bottom:1rem">D362.50</p>
+      <div class="form-group">
+        <label>Coupon code (optional)</label>
+        <div class="flex gap-2 flex-wrap" style="align-items:flex-end">
+          <input type="text" id="coupon-code" class="input" placeholder="Enter code" style="flex:1;min-width:140px;margin:0;text-transform:uppercase" autocomplete="off">
+          <button type="button" id="apply-coupon-btn" class="btn btn-secondary">Apply</button>
+        </div>
+        <p id="coupon-hint" class="text-sm opacity-70 mt-1 hidden"></p>
+      </div>
+      <p class="payment-amount" id="payment-amount" data-price-group style="font-size:1.75rem;margin-bottom:0.25rem">D362.50</p>
+      <p id="payment-original-amount" class="text-sm opacity-60 hidden" style="text-decoration:line-through"></p>
+      <p id="payment-discount-note" class="text-sm hidden mb-2" style="color:var(--accent)"></p>
       <div id="payment-methods" class="payment-methods"></div>
       <div id="payment-details-panel" class="payment-details-panel hidden"></div>
       <div id="manual-receipt-block" class="hidden">
@@ -111,6 +121,7 @@
     void Payments.renderPaymentMethods(document.getElementById('payment-methods'), 'group', {
       beforeAuth: ensureRegisteredForPay,
     });
+    Payments.bindCouponUI('group');
 
     let receiptFile = null;
     document.getElementById('receipt-file').addEventListener('change', (e) => {
