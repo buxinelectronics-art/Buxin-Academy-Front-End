@@ -28,10 +28,10 @@ const BuxinEV = {
     ZA: { name: 'South Africa', flag: '🇿🇦', currency: 'ZAR', symbol: 'R', rate: 18.5,
       payment_methods: ['EFT', 'SnapScan', 'Visa', 'Mastercard', 'Bank Transfer'] },
     OTHER: { name: 'Other country', flag: '🌍', currency: 'USD', symbol: '$', rate: 1,
-      payment_methods: ['Bank Transfer', 'Visa', 'Mastercard', 'Western Union / MoneyGram / Ria'] },
+      payment_methods: ['PayPal', 'Bank Transfer', 'Visa', 'Mastercard', 'Western Union / MoneyGram / Ria'] },
   },
 
-  GROUP_PRICE_USD: 5,
+  GROUP_PRICE_USD: 1,
   INDIVIDUAL_PRICE_USD: 100,
 
   isOtherCountry(code = null) {
@@ -472,6 +472,9 @@ const BuxinEV = {
     });
     document.querySelectorAll('[data-price-individual]').forEach(el => {
       el.textContent = individual.formatted;
+    });
+    document.querySelectorAll('[data-community-tagline]').forEach(el => {
+      el.textContent = `Just for ${group.formatted}`;
     });
     document.querySelectorAll('[data-country-name]').forEach(el => {
       el.textContent = this.getCountry().name;
