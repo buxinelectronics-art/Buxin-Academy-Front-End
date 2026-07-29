@@ -182,6 +182,8 @@ const Payments = {
 
     this._setReceiptVisible(true);
 
+    document.getElementById('paypal-buttons-wrap')?.classList.add('hidden');
+
     const hidden = document.getElementById('payment-method-value');
 
     if (hidden) hidden.value = this.getSelectedMethod();
@@ -199,6 +201,7 @@ const Payments = {
     this._selectedTier = null;
 
     await BuxinModemPay.loadConfig();
+    await BuxinPayPal.loadConfig();
 
 
 
@@ -267,6 +270,14 @@ const Payments = {
           <span class="pay-option-desc">Western Union · MoneyGram · Ria — upload receipt after</span>
 
         </button>
+
+        ${BuxinPayPal.isAvailable() ? `
+        <button type="button" class="pay-option pay-option--paypal" data-tier="paypal">
+          <span class="pay-option-icon" aria-hidden="true">🅿️</span>
+          <span class="pay-option-title">PayPal</span>
+          <span class="pay-option-desc">Pay in USD — instant access, no receipt upload</span>
+          <span class="pay-option-cta">Pay with PayPal →</span>
+        </button>` : ''}
 
       </div>
 
@@ -338,6 +349,18 @@ const Payments = {
 
     });
 
+    const paypalBtn = container.querySelector('[data-tier="paypal"]');
+    paypalBtn?.addEventListener('click', async () => {
+      try {
+        document.getElementById('paypal-buttons-wrap')?.classList.add('hidden');
+        await BuxinPayPal.selectTier(classType, options);
+      } catch (err) {
+        if (!err?.cancelled) {
+          BuxinEV.showToast(err.error || err.message || 'PayPal unavailable', 'error');
+        }
+      }
+    });
+
   },
 
 
@@ -348,7 +371,17 @@ const Payments = {
 
     const all = BuxinEV.getCountry().payment_methods || [];
 
-    let html = all.map((m) => `
+    let html = '';
+
+    if (BuxinPayPal.isAvailable()) {
+      html += `
+        <button type="button" class="payment-method-card instant-pay-btn pay-option pay-option--paypal" data-tier="paypal">
+          <span class="method-icon">🅿️</span>
+          <span><strong>PayPal</strong><br><small class="opacity-70">Instant — pay in USD</small></span>
+        </button>`;
+    }
+
+    html += all.map((m) => `
 
       <label class="payment-method-card">
 
@@ -365,6 +398,16 @@ const Payments = {
     container.innerHTML = html;
 
     this._setReceiptVisible(all.length > 0);
+
+    container.querySelector('[data-tier="paypal"]')?.addEventListener('click', async () => {
+      try {
+        await BuxinPayPal.selectTier(classType, options);
+      } catch (err) {
+        if (!err?.cancelled) {
+          BuxinEV.showToast(err.error || err.message || 'PayPal unavailable', 'error');
+        }
+      }
+    });
 
   },
 
@@ -595,6 +638,10 @@ const Payments = {
 
     }
 
+    if (BuxinPayPal.isPayPalMethod(method)) {
+      return BuxinPayPal.selectTier(classType);
+    }
+
     this._submitting = true;
 
     if (btn) btn.disabled = true;
@@ -788,6 +835,12 @@ const Payments = {
       const file = this._receiptFile || document.getElementById('receipt-file')?.files?.[0];
 
 
+
+      if (this._selectedTier === 'paypal' || BuxinPayPal.isPayPalMethod(method)) {
+
+        return this.handleInstantPay(classType, BuxinPayPal.PAYPAL_METHOD);
+
+      }
 
       if (this.isWalletTier() || BuxinModemPay.isInstantMethod(method)) {
 
