@@ -78,7 +78,7 @@
 
 
 
-      if (user && Auth.isSubscriptionActive(user)) {
+      if (user && Auth.hasPaidAccess(user)) {
 
         setStatus('✅', 'Payment successful', 'Your account is active. Opening dashboard…');
 
@@ -128,7 +128,7 @@
 
       user = await Auth.refreshUser();
 
-      if (user && Auth.isSubscriptionActive(user)) {
+      if (user && Auth.hasPaidAccess(user)) {
 
         setStatus('✅', 'Payment successful', 'Welcome to Buxin Academy! Opening dashboard…');
 
