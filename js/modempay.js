@@ -21,7 +21,8 @@ const BuxinModemPay = {
   },
 
   isInstantMethod(name) {
-    return name === this.WALLET_METHOD
+    return (typeof BuxinPayPal !== 'undefined' && BuxinPayPal.isPayPalMethod(name))
+      || name === this.WALLET_METHOD
       || ['Wave', 'AfriMoney', 'APS Wallet'].includes(name);
   },
 
