@@ -27,8 +27,8 @@
 
   <main class="container" style="padding:2rem 1rem;max-width:640px">
     <span class="hero-badge">Sunday Robotics · Community Learning</span>
-    <h1>Join Group Class</h1>
-    <p class="opacity-70 mb-2">Only <strong data-price-group>D362.50</strong> — pay &amp; upload receipt below</p>
+    <h1>Join Our Community</h1>
+    <p class="opacity-70 mb-2">Only <strong data-price-group>D72.50</strong> — pay &amp; upload receipt below</p>
 
     <form id="group-register-form" class="glass" style="padding:1.5rem;margin-top:1.5rem">
       <h2 class="text-sm mb-3" style="color:var(--primary)">Your details</h2>
@@ -61,7 +61,7 @@
         <p class="text-sm opacity-70 mt-1">Fill in your details above first, then Apply. Covers this 30-day month only — renew with pay or a new coupon next month.</p>
         <p id="coupon-hint" class="text-sm opacity-70 mt-1 hidden"></p>
       </div>
-      <p class="payment-amount" id="payment-amount" data-price-group style="font-size:1.75rem;margin-bottom:0.25rem">D362.50</p>
+      <p class="payment-amount" id="payment-amount" data-price-group style="font-size:1.75rem;margin-bottom:0.25rem">D72.50</p>
       <p id="payment-original-amount" class="text-sm opacity-60 hidden" style="text-decoration:line-through"></p>
       <p id="payment-discount-note" class="text-sm hidden mb-2" style="color:var(--accent)"></p>
       <div id="payment-methods" class="payment-methods"></div>
@@ -82,6 +82,7 @@
   <script src="js/app.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/modempay.js"></script>
+  <script src="js/paypal.js"></script>
   <script src="js/payments.js"></script>
   <script>
     if (!localStorage.getItem('buxinev_country')) location.href = 'index.html';
@@ -146,7 +147,30 @@
         || document.querySelector('input[name=payment_method]:checked')?.value;
       const receipt = receiptFile || document.getElementById('receipt-file').files?.[0];
 
-      if (!method) { BuxinEV.showToast('Select bank transfer or money transfer above', 'error'); return; }
+      if (Payments._selectedTier === 'paypal' || BuxinPayPal.isPayPalMethod(method)) {
+        try {
+          await ensureRegisteredForPay();
+          await BuxinPayPal.selectTier('group', { beforeAuth: ensureRegisteredForPay });
+        } catch (err) {
+          if (!err?.cancelled) BuxinEV.showToast(err.error || err.message || 'PayPal unavailable', 'error');
+        }
+        return;
+      }
+
+      if (Payments.isWalletTier() || BuxinModemPay.isInstantMethod(method)) {
+        try {
+          await ensureRegisteredForPay();
+          await Payments.handleInstantPay('group', method || BuxinModemPay.WALLET_METHOD, btn);
+        } catch (err) {
+          if (!err?.cancelled) BuxinEV.showToast(err.error || err.message || 'Payment failed', 'error');
+          submitting = false;
+          btn.disabled = false;
+          status.textContent = '';
+        }
+        return;
+      }
+
+      if (!method) { BuxinEV.showToast('Select a payment method above', 'error'); return; }
 
       submitting = true;
       btn.disabled = true;
