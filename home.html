@@ -37,18 +37,19 @@
 
     <h1 class="section-title home-pricing-title">Learning Robotics &amp; AI</h1>
 
-    <div class="pricing-grid home-pricing-grid">
+    <div id="home-pricing-grid" class="pricing-grid home-pricing-grid home-pricing-grid--single">
       <article class="pricing-card glass home-class-card">
-        <h2>Group Class</h2>
-        <p class="home-card-note">Sundays</p>
-        <p class="price" data-price-group>D362.50</p>
+        <h2>Join Our Community</h2>
+        <p class="home-card-note">Sundays · Group learning</p>
+        <p class="home-community-tagline" data-community-tagline>Just for D72.50</p>
+        <p class="price" data-price-group>D72.50</p>
         <a href="group-class.html" class="btn btn-primary btn-block">Register</a>
       </article>
 
-      <article class="pricing-card glass home-class-card">
+      <article id="individual-class-card" class="pricing-card glass home-class-card hidden">
         <h2>Individual Class</h2>
         <p class="home-card-note">One-on-one · 6-month track</p>
-        <p class="text-sm opacity-70">Robotics, IoT, Python, Full Stack, AI & more</p>
+        <p class="text-sm opacity-70">Robotics, IoT, Python, Full Stack, AI &amp; more</p>
         <p class="price" data-price-individual>D7,250.00</p>
         <a href="individual-class.html" class="btn btn-primary btn-block">Register</a>
       </article>
@@ -81,10 +82,18 @@
 
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/site-settings.js"></script>
   <script src="js/auth.js"></script>
   <script>
-    if (!localStorage.getItem('buxinev_country')) location.href = 'index.html';
-    BuxinEV.updatePriceElements();
+    (async () => {
+      if (!localStorage.getItem('buxinev_country')) {
+        location.href = 'index.html';
+        return;
+      }
+      BuxinEV.updatePriceElements();
+      const settings = await SiteSettings.load();
+      SiteSettings.applyHomePricing(settings);
+    })();
   </script>
 </body>
 </html>
