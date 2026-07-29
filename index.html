@@ -34,7 +34,7 @@
 
       <h1>Welcome to Buxin Academy</h1>
 
-      <p class="opacity-70">Select your country to see prices in your local currency and available payment methods.</p>
+      <p class="opacity-70">Select your country to see available payment methods in your region.</p>
 
 
 
@@ -88,15 +88,7 @@
 
 
 
-      <div class="glass" style="padding:1rem;margin:1rem 0;text-align:left">
-
-        <p class="text-sm opacity-70">Preview prices:</p>
-
-        <p>Group Class: <strong data-price-group>D362.50</strong></p>
-
-        <p>Individual: <strong data-price-individual>D7,250.00</strong></p>
-
-      </div>
+      <div id="welcome-slider" class="welcome-slider" aria-label="Academy highlights"></div>
 
 
 
@@ -111,6 +103,8 @@
   <script src="js/config.js"></script>
 
   <script src="js/app.js"></script>
+
+  <script src="js/site-settings.js"></script>
 
   <script src="js/auth.js"></script>
 
@@ -182,8 +176,6 @@
 
         flagDisplay.textContent = BuxinEV.getCountry().flag;
 
-        BuxinEV.updatePriceElements();
-
       }
 
 
@@ -253,6 +245,12 @@
       syncOtherVisibility();
 
       applySelection();
+
+      const settings = await SiteSettings.load();
+      SiteSettings.mountWelcomeSlider(
+        document.getElementById('welcome-slider'),
+        SiteSettings.slidesFromSettings(settings),
+      );
 
     })();
 
