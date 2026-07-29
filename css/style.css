@@ -935,8 +935,12 @@ th { color: var(--text-muted); font-weight: 600; }
   max-width: 720px;
 }
 .home-pricing-grid--single {
-  max-width: 420px;
+  width: 100%;
+  max-width: 800px;
   margin: 0 auto;
+}
+.home-pricing-grid--single .home-class-card {
+  padding: 2.5rem 2rem;
 }
 .home-community-tagline {
   font-size: 1.1rem;
